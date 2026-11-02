@@ -49,9 +49,16 @@ class RAGService:
         self.retrieval_service = retrieval_service or RetrievalService()
         self.min_similarity_threshold = min_similarity_threshold
         self.provider = os.getenv("LLM_PROVIDER", "openai").lower()
-        self.api_key = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", ""))
-        self.model = os.getenv("LLM_MODEL", "gpt-4o-mini")
-        self.base_url = os.getenv("LLM_BASE_URL", None)
+        self.api_key = os.getenv("LLM_API_KEY", os.getenv("OPENAI_API_KEY", os.getenv("GROQ_API_KEY", ""))).strip()
+        
+        # Auto-configure Groq endpoint when a Groq key (gsk_...) is supplied
+        if self.api_key.startswith("gsk_") or self.provider == "groq":
+            self.provider = "groq"
+            self.base_url = os.getenv("LLM_BASE_URL", "https://api.groq.com/openai/v1")
+            self.model = os.getenv("LLM_MODEL", "openai/gpt-oss-120b")
+        else:
+            self.model = os.getenv("LLM_MODEL", "gpt-4o-mini")
+            self.base_url = os.getenv("LLM_BASE_URL", None)
 
     def ask(self, question: str, machine_code: str, machine_name: str = "") -> Dict[str, Any]:
         """
@@ -125,11 +132,11 @@ class RAGService:
         hits: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """Dispatches to OpenAI or Grounded Deterministic Extractor."""
-        if self.provider == "openai" and self.api_key and not self.api_key.startswith("replace-"):
+        if self.provider in ("openai", "groq") and self.api_key and not self.api_key.startswith("replace-"):
             try:
                 return self._call_openai(question, machine_code, machine_name, hits)
             except Exception as e:
-                print(f"[RAGService] OpenAI call failed: {e}. Using grounded fallback.")
+                print(f"[RAGService] {self.provider.upper()} API call failed: {e}. Using grounded fallback.")
                 return self._grounded_extractor(question, machine_code, hits)
 
         return self._grounded_extractor(question, machine_code, hits)
