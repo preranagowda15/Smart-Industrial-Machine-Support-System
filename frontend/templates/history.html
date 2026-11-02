@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Question History{% endblock %}
+{% block page_heading %}Maintenance Question History{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="industrial-card">
+      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+          <span class="fw-bold">Audit Trail & Past Queries</span>
+          <small class="text-muted ms-2">
+            {% if user.role == "ENGINEER" %}Showing your private question logs{% else %}Showing team-wide question logs{% endif %}
+          </small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <select id="history-machine-filter" class="form-select form-select-sm" style="width: auto;">
+            <option value="">All Machines</option>
+            {% for m in machines %}
+              <option value="{{ m.machine_code }}">{{ m.machine_code }}</option>
+            {% endfor %}
+          </select>
+          <button id="history-refresh-btn" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-clockwise"></i>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="history-table">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 140px;">Timestamp</th>
+              {% if user.role != "ENGINEER" %}<th>User</th>{% endif %}
+              <th>Machine</th>
+              <th>Question & Grounded Answer</th>
+              <th style="width: 140px;">Evidence Status</th>
+              <th>Verifiable Sources</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">
+                <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+                Loading query history...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const tbody = document.getElementById("history-table-body");
+  const machineFilter = document.getElementById("history-machine-filter");
+  const refreshBtn = document.getElementById("history-refresh-btn");
+
+  async function loadHistory() {
+    const mid = machineFilter.value;
+    let url = "/api/assistant/history/";
+    if (mid) url += `?machine_code=${encodeURIComponent(mid)}`;
+
+    try {
+      const resp = await App.apiFetch(url);
+      if (!resp || !resp.ok) return;
+      const data = await resp.json();
+
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No query logs recorded yet.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = data.map(item => {
+        const isAnswered = item.status === "ANSWERED";
+        const badge = isAnswered 
+          ? `<span class="badge badge-answered"><i class="bi bi-check-circle-fill me-1"></i>ANSWERED</span>`
+          : `<span class="badge badge-insufficient"><i class="bi bi-exclamation-triangle-fill me-1"></i>INSUFFICIENT</span>`;
+
+        const sources = (item.source_references && item.source_references.length > 0)
+          ? item.source_references.map(s => `
+              <div class="d-inline-block me-1 mb-1">
+                <a href="${s.pdf_url}" target="_blank" class="badge bg-light text-dark border text-decoration-none">
+                  <i class="bi bi-file-earmark-pdf text-danger me-1"></i>${s.document_name} p.${s.pdf_page}
+                </a>
+              </div>
+            `).join("")
+          : `<span class="text-muted small">&mdash;</span>`;
+
+        const userCol = `{{ user.role }}` !== "ENGINEER" 
+          ? `<td><span class="badge bg-secondary">${item.username}</span></td>`
+          : "";
+
+        return `
+          <tr>
+            <td><small class="text-muted">${new Date(item.timestamp).toLocaleString()}</small></td>
+            ${userCol}
+            <td><span class="badge bg-light text-dark border">${item.machine_code}</span></td>
+            <td>
+              <div class="fw-bold text-dark mb-1">${item.question}</div>
+              <div class="text-secondary small" style="max-height: 80px; overflow-y: auto;">${item.answer}</div>
+            </td>
+            <td>${badge}</td>
+            <td>${sources}</td>
+          </tr>
+        `;
+      }).join("");
+
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-danger text-center py-4">Failed to load history: ${err.message}</td></tr>`;
+    }
+  }
+
+  machineFilter.addEventListener("change", loadHistory);
+  refreshBtn.addEventListener("click", loadHistory);
+  loadHistory();
+});
+</script>
+{% endblock %}

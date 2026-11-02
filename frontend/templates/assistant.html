@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AI Maintenance Assistant{% endblock %}
+{% block page_heading %}AI Maintenance Assistant{% endblock %}
+
+{% block navbar_extra %}
+  <div class="d-flex align-items-center gap-2">
+    <label for="assistant-machine-select" class="small fw-semibold text-secondary mb-0">Target Machine:</label>
+    <select id="assistant-machine-select" class="form-select form-select-sm" style="width: auto; min-width: 260px;">
+      {% for m in machines %}
+        <option value="{{ m.machine_code }}" {% if forloop.first %}selected{% endif %}>
+          {{ m.machine_code }} &mdash; {{ m.machine_name }}
+        </option>
+      {% empty %}
+        <option value="">No registered machines</option>
+      {% endfor %}
+    </select>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-xl-10 mx-auto">
+    <!-- Notice Banner -->
+    <div class="alert alert-info py-2 px-3 small d-flex align-items-center justify-content-between mb-3">
+      <div>
+        <i class="bi bi-info-circle-fill me-2 text-primary"></i>
+        <span>Answers are strictly grounded in the official PDF manuals of the selected machine. Retrieval isolation is enforced on every query.</span>
+      </div>
+      <span class="badge bg-primary text-white">Machine Isolated</span>
+    </div>
+
+    <!-- Main Chat Window -->
+    <div class="chat-container">
+      <div id="chat-messages" class="chat-messages">
+        <!-- Initial Welcome Message -->
+        <div class="message-bubble message-assistant message-answered">
+          <div class="d-flex align-items-center mb-2">
+            <span class="badge bg-secondary me-2"><i class="bi bi-robot me-1"></i>SYSTEM READY</span>
+            <small class="text-muted ms-auto">Connected</small>
+          </div>
+          <div>
+            Welcome to the <strong>Manufacturing Maintenance Assistant</strong>. 
+            Select your machine above and ask any maintenance, alarm code, or operating parameter question.
+            All responses will cite the exact document and physical PDF page.
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Prompt Chips -->
+      <div class="px-3 pt-2 border-top bg-light">
+        <small class="text-muted fw-semibold" style="font-size: 0.75rem;">QUICK SCENARIO PROMPTS (CLICK TO ASK):</small>
+        <div id="prompt-chips-container" class="prompt-chips"></div>
+      </div>
+
+      <!-- Input Area -->
+      <div class="p-3 bg-white border-top">
+        <div class="input-group">
+          <textarea 
+            id="assistant-question-input" 
+            class="form-control" 
+            rows="2" 
+            placeholder="e.g. What does E17 mean? Or: What should be inspected during maintenance?" 
+            style="resize: none;"
+          ></textarea>
+          <button id="assistant-send-btn" class="btn btn-primary px-4 d-flex align-items-center gap-2">
+            <i class="bi bi-send-fill"></i>
+            <span>Ask</span>
+          </button>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 small text-muted">
+          <span><kbd>Enter</kbd> to submit query &bull; <kbd>Shift + Enter</kbd> for newline</span>
+          <span>Never controls physical equipment or replaces safety lock-out procedures.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/assistant.js' %}"></script>
+{% endblock %}

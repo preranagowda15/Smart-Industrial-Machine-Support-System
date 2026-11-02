@@ -1,0 +1,520 @@
+{
+  "project_name": "Manufacturing Manual Assistant",
+  "version": "1.0.0",
+  "last_updated": "2026-11-02T14:45:00+05:30",
+  "status_summary": {
+    "NOT_STARTED": 40,
+    "IN_PROGRESS": 2,
+    "IMPLEMENTED": 0,
+    "TESTING": 0,
+    "VERIFIED": 0,
+    "BLOCKED": 0
+  },
+  "nodes": [
+    {
+      "id": "infra_env_config",
+      "category": "Infrastructure",
+      "name": "Environment Configuration",
+      "description": "Environment variables configuration (.env.example, .env) with database URLs, model keys, secrets, paths.",
+      "dependencies": [],
+      "input": "Configuration settings & secrets",
+      "output": ".env.example, .env files loaded via python-dotenv",
+      "status": "IN_PROGRESS",
+      "validation_criteria": "Environment loads correctly; all required parameters (SECRET_KEY, DATABASE_URL, LLM configs) exist."
+    },
+    {
+      "id": "infra_django_config",
+      "category": "Infrastructure",
+      "name": "Django Settings & Modular Configuration",
+      "description": "Django settings.py, urls.py, wsgi.py, asgi.py with CORS, DRF, JWT, static/media handling.",
+      "dependencies": ["infra_env_config"],
+      "input": "Base directory, installed apps list, middleware, database config",
+      "output": "Ready Django configuration module (backend/config/)",
+      "status": "NOT_STARTED",
+      "validation_criteria": "manage.py check passes without warnings; settings load correctly."
+    },
+    {
+      "id": "infra_db_config",
+      "category": "Infrastructure",
+      "name": "PostgreSQL & SQLite Dual Database Configuration",
+      "description": "Database connectivity supporting PostgreSQL when DATABASE_URL is set, and SQLite fallback for development.",
+      "dependencies": ["infra_django_config"],
+      "input": "DATABASE_URL connection string",
+      "output": "Working database engine in settings.DATABASES",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Migrations run without errors and schema builds on database."
+    },
+    {
+      "id": "infra_static_files",
+      "category": "Infrastructure",
+      "name": "Static Files Configuration",
+      "description": "Configuration for CSS, JavaScript, and Bootstrap 5 assets in frontend/static.",
+      "dependencies": ["infra_django_config"],
+      "input": "Static assets in frontend/static/",
+      "output": "Properly served static endpoints and collectstatic compatibility",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Static assets return HTTP 200 and CSS/JS load properly in browser."
+    },
+    {
+      "id": "infra_media_storage",
+      "category": "Infrastructure",
+      "name": "Media Storage Configuration",
+      "description": "Storage configuration for uploaded PDF machine manuals under media/manuals/ with direct page link navigation.",
+      "dependencies": ["infra_django_config"],
+      "input": "Uploaded PDF documents",
+      "output": "media/manuals/ storage and URL routing /media/manuals/<filename>#page=<page>",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Manual PDFs stored securely, accessible via HTTP with range support for #page navigation."
+    },
+    {
+      "id": "infra_auth_config",
+      "category": "Infrastructure",
+      "name": "Authentication & Authorization Configuration",
+      "description": "JWT authentication + Session auth, password hashers, role-based permission classes.",
+      "dependencies": ["infra_django_config", "db_user"],
+      "input": "Credentials (username/password), JWT Bearer tokens, session cookies",
+      "output": "Authenticated request.user with role context",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Tokens issue correctly; unauthorized requests receive HTTP 401/403."
+    },
+
+    {
+      "id": "db_user",
+      "category": "Database",
+      "name": "User & Role Model",
+      "description": "User entity with roles: Administrator, Engineer, Supervisor.",
+      "dependencies": ["infra_db_config"],
+      "input": "Username, email, password, role",
+      "output": "User database record with role field and helper methods",
+      "status": "NOT_STARTED",
+      "validation_criteria": "User creation enforces valid roles; role checking helper functions work."
+    },
+    {
+      "id": "db_machine",
+      "category": "Database",
+      "name": "Machine Model",
+      "description": "Machine entity storing machine_code (e.g. M-HP200, M-AC90), machine_name, manufacturer, description.",
+      "dependencies": ["infra_db_config"],
+      "input": "machine_code, machine_name, manufacturer, description",
+      "output": "Machine table row and relational foreign keys",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Unique machine_code enforced; machine listing queries perform cleanly."
+    },
+    {
+      "id": "db_manual",
+      "category": "Database",
+      "name": "Manual Model",
+      "description": "Manual entity linked to Machine, document_name, revision, pdf_file, total_pages, uploaded_by, ingestion_status.",
+      "dependencies": ["db_machine", "db_user"],
+      "input": "Machine FK, document_name, revision, pdf_file, ingestion_status",
+      "output": "Manual record with ingestion state tracking",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Ingestion status cycles through PENDING, PROCESSING, COMPLETED, FAILED."
+    },
+    {
+      "id": "db_document_chunk",
+      "category": "Database",
+      "name": "Document Chunk Model",
+      "description": "Passage chunk storage preserving 1-based page number, chunk index, text, embedding ID, Machine FK, Manual FK.",
+      "dependencies": ["db_manual"],
+      "input": "Extracted text passage, page_number, chunk_index, machine, manual",
+      "output": "Persistent DocumentChunk record",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Each chunk links to exact 1-based page number and machine ID."
+    },
+    {
+      "id": "db_question_history",
+      "category": "Database",
+      "name": "Question History Model",
+      "description": "Question log persisting user, machine, question, answer, status (ANSWERED, INSUFFICIENT_EVIDENCE, ERROR), retrieved_sources JSON.",
+      "dependencies": ["db_user", "db_machine"],
+      "input": "User, Machine, query text, generated answer, sources",
+      "output": "QuestionHistory record",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Every query is saved; status flags accurately reflect evidence grounding."
+    },
+    {
+      "id": "db_source_reference",
+      "category": "Database",
+      "name": "Source Reference Model",
+      "description": "Citation source relation linking QuestionHistory to Manual, page number, and passage text.",
+      "dependencies": ["db_question_history", "db_manual"],
+      "input": "QuestionHistory FK, Manual FK, page_number, passage snippet",
+      "output": "Structured citation records",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Verifiable citations persisted and inspectable via API and supervisor views."
+    },
+
+    {
+      "id": "service_pdf_processor",
+      "category": "Backend",
+      "name": "PDF Extraction Service",
+      "description": "Extracts text page-by-page from PDF manuals using PyMuPDF, preserving 1-based PDF page indices.",
+      "dependencies": ["infra_django_config"],
+      "input": "PDF file path / stream",
+      "output": "List of {page_number: int, text: str}",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Zero-based internal index converted to 1-based PDF page numbers; empty pages handled."
+    },
+    {
+      "id": "service_chunking",
+      "category": "Backend",
+      "name": "Chunking Service",
+      "description": "Splits text into 700-1000 char passages with 100-150 char overlap at paragraph boundaries with full metadata.",
+      "dependencies": ["service_pdf_processor"],
+      "input": "Page text and metadata (machine_id, document_name, revision, page_number)",
+      "output": "List of chunk dicts with preserved metadata",
+      "status": "NOT_STARTED",
+      "validation_criteria": "No source metadata lost during chunking; chunk size within specified bounds."
+    },
+    {
+      "id": "service_embedding",
+      "category": "Backend",
+      "name": "Embedding Service",
+      "description": "Configurable embedding generator supporting OpenAI, Sentence Transformers, and deterministic fallback.",
+      "dependencies": ["infra_env_config"],
+      "input": "List of text strings",
+      "output": "List of vector embeddings (list of floats)",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Generates normalized embeddings; fails gracefully with fallback if external API unavailable."
+    },
+    {
+      "id": "service_vector_store",
+      "category": "Backend",
+      "name": "Vector Storage Service",
+      "description": "Persistent vector database with ChromaDB and high-performance persistent fallback, supporting metadata filtering.",
+      "dependencies": ["service_embedding"],
+      "input": "Embeddings, chunk IDs, documents, metadata",
+      "output": "Persistent vector collection with querying capabilities",
+      "status": "IN_PROGRESS",
+      "validation_criteria": "Idempotent upserting (no duplicates); persists across process restarts."
+    },
+    {
+      "id": "service_retrieval",
+      "category": "Backend",
+      "name": "Machine-Isolated Retrieval Service",
+      "description": "Retrieves relevant passages with mandatory machine_id filtering inside vector database query. Supports multi-doc for HP200.",
+      "dependencies": ["service_vector_store", "service_embedding"],
+      "input": "Query text, selected machine_id, top_k, threshold",
+      "output": "Filtered list of relevant chunks from the selected machine only",
+      "status": "NOT_STARTED",
+      "validation_criteria": "M-HP200 query NEVER returns M-AC90 chunks; M-AC90 query NEVER returns M-HP200 chunks."
+    },
+    {
+      "id": "service_rag_orchestration",
+      "category": "Backend",
+      "name": "RAG Orchestration & Evidence Grounding Service",
+      "description": "Coordinates retrieval, similarity threshold check, strict system prompt instruction, LLM answer generation, evidence status.",
+      "dependencies": ["service_retrieval"],
+      "input": "Question, selected Machine object",
+      "output": "{answer, evidence_status, supporting_passages, citations}",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Unanswerable or below-threshold questions return 'The available manuals do not contain enough information to answer this question.'"
+    },
+    {
+      "id": "service_citation",
+      "category": "Backend",
+      "name": "Citation Validation Service",
+      "description": "Validates citations against actual retrieved source IDs, prevents hallucinated citations, formats PDF #page=X links.",
+      "dependencies": ["service_rag_orchestration"],
+      "input": "LLM response and retrieved chunk list",
+      "output": "Validated list of citations with verified page numbers and working PDF links",
+      "status": "NOT_STARTED",
+      "validation_criteria": "No citation emitted that does not match a retrieved chunk from the selected machine."
+    },
+    {
+      "id": "api_auth",
+      "category": "Backend",
+      "name": "Authentication APIs",
+      "description": "POST /api/auth/login/, POST /api/auth/logout/, GET /api/auth/me/.",
+      "dependencies": ["infra_auth_config", "db_user"],
+      "input": "Credentials",
+      "output": "JWT tokens / session, user info, role",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Valid credentials return tokens/session and user profile; invalid return HTTP 400/401."
+    },
+    {
+      "id": "api_user_mgmt",
+      "category": "Backend",
+      "name": "User Management APIs",
+      "description": "Admin APIs for listing users, viewing roles, creating accounts.",
+      "dependencies": ["api_auth"],
+      "input": "Admin authorization",
+      "output": "User listing, role assignment",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Only Administrator can view/manage user accounts."
+    },
+    {
+      "id": "api_machines",
+      "category": "Backend",
+      "name": "Machine APIs",
+      "description": "GET /api/machines/, POST /api/machines/, GET /api/machines/{id}/.",
+      "dependencies": ["db_machine", "infra_auth_config"],
+      "input": "Machine registration data",
+      "output": "Machine JSON objects",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Authenticated users can list machines; only Administrator can register machines."
+    },
+    {
+      "id": "api_manuals",
+      "category": "Backend",
+      "name": "Manual Management & Upload APIs",
+      "description": "GET /api/manuals/, POST /api/manuals/upload/, GET /api/manuals/{id}/, GET /api/manuals/{id}/status/.",
+      "dependencies": ["db_manual", "service_pdf_processor", "service_chunking", "service_vector_store"],
+      "input": "Multipart PDF upload, machine_id, document_name, revision",
+      "output": "Manual metadata, ingestion status, passage count",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Only Administrator can upload (Engineer receives HTTP 403 Forbidden)."
+    },
+    {
+      "id": "api_question_history",
+      "category": "Backend",
+      "name": "Assistant Question & History APIs",
+      "description": "POST /api/assistant/ask/, GET /api/assistant/history/, GET /api/assistant/history/{id}/.",
+      "dependencies": ["service_rag_orchestration", "service_citation", "db_question_history"],
+      "input": "machine_id, question text",
+      "output": "Grounded answer, evidence status, citations, history log record",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Engineer can ask and view own history; Supervisor/Admin can view all."
+    },
+    {
+      "id": "api_supervisor_dashboard",
+      "category": "Backend",
+      "name": "Supervisor Dashboard APIs",
+      "description": "GET /api/supervisor/questions/, GET /api/supervisor/unanswered/, GET /api/supervisor/metrics/.",
+      "dependencies": ["db_question_history", "infra_auth_config"],
+      "input": "Supervisor / Admin authorization",
+      "output": "Aggregated metrics, unanswered/insufficient questions, query breakdown by machine",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Returns accurate metrics for answered vs insufficient questions; restricted to Supervisor/Admin."
+    },
+
+    {
+      "id": "fe_login",
+      "category": "Frontend",
+      "name": "Login Interface",
+      "description": "Login page with role indicators, credentials form, error feedback, demo user quick-selection.",
+      "dependencies": ["api_auth", "infra_static_files"],
+      "input": "Username, password",
+      "output": "Authentication token/session and redirect to role dashboard",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Submits via Fetch API; displays errors gracefully; redirects appropriately."
+    },
+    {
+      "id": "fe_dashboard",
+      "category": "Frontend",
+      "name": "Dashboard Navigation & Shell",
+      "description": "Industrial SaaS navigation layout, dark navy sidebar, breadcrumbs, user role badge, logout.",
+      "dependencies": ["infra_static_files"],
+      "input": "User role, session",
+      "output": "Responsive application shell",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Adapts sidebar links to user role (Admin, Engineer, Supervisor)."
+    },
+    {
+      "id": "fe_machine_selection",
+      "category": "Frontend",
+      "name": "Machine Selection Component",
+      "description": "Dropdown and card view for selecting active machine (HP-200, AC-90) with model and manufacturer specs.",
+      "dependencies": ["api_machines", "fe_dashboard"],
+      "input": "Machine list API response",
+      "output": "Selected machine state in assistant and manuals view",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Changing machine updates assistant context and isolates manual retrieval."
+    },
+    {
+      "id": "fe_manual_management",
+      "category": "Frontend",
+      "name": "Manual Management View",
+      "description": "Lists registered manuals, document IDs, revisions, page counts, indexing status badges.",
+      "dependencies": ["api_manuals", "fe_dashboard"],
+      "input": "Manuals API data",
+      "output": "Interactive table with status indicators and download/view links",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Displays ingestion status (COMPLETED, PROCESSING, FAILED) accurately."
+    },
+    {
+      "id": "fe_manual_upload",
+      "category": "Frontend",
+      "name": "Manual Upload Modal / Form",
+      "description": "Administrator form to upload PDF manuals with machine selector, document name, revision.",
+      "dependencies": ["api_manuals", "fe_manual_management"],
+      "input": "File input, machine ID, document name, revision",
+      "output": "Upload progress and indexing confirmation",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Hidden or disabled for non-admins; backend enforces 403 if tampered."
+    },
+    {
+      "id": "fe_ai_assistant",
+      "category": "Frontend",
+      "name": "AI Assistant Chat Interface",
+      "description": "Interactive chat interface: machine selector, question input, sample prompt chips, loading spinner, response display.",
+      "dependencies": ["api_question_history", "fe_machine_selection"],
+      "input": "User question and machine choice",
+      "output": "Rendered grounded answer, status badge, evidence explanation",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Shows green badge for ANSWERED, amber for INSUFFICIENT_EVIDENCE, red for errors."
+    },
+    {
+      "id": "fe_chat_history",
+      "category": "Frontend",
+      "name": "Chat History Viewer",
+      "description": "Shows past queries, answers, timestamps, machine badges, and evidence status.",
+      "dependencies": ["api_question_history", "fe_dashboard"],
+      "input": "Question history records",
+      "output": "Filterable history table / cards",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Engineers see only their queries; Supervisors and Admins see team history."
+    },
+    {
+      "id": "fe_citation_viewer",
+      "category": "Frontend",
+      "name": "Citation & PDF Link Viewer",
+      "description": "Displays verifiable source citations: document name, revision, PDF page, extracted passage, and 'Open PDF Page' button.",
+      "dependencies": ["fe_ai_assistant", "infra_media_storage"],
+      "input": "Citations list in answer response",
+      "output": "Clickable PDF page link /media/manuals/<doc>#page=<page>",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Clicking button opens exact PDF and navigates to the cited page."
+    },
+    {
+      "id": "fe_supervisor_dashboard",
+      "category": "Frontend",
+      "name": "Supervisor Dashboard View",
+      "description": "Analytics cards (Total questions, Answered, Insufficient Evidence), machine breakdown chart/table, unanswered log.",
+      "dependencies": ["api_supervisor_dashboard", "fe_dashboard"],
+      "input": "Supervisor metrics API data",
+      "output": "Visual dashboard with status metrics and review tables",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Read-only interface showing all team questions and insufficient-evidence queries."
+    },
+    {
+      "id": "fe_user_management",
+      "category": "Frontend",
+      "name": "User Management View",
+      "description": "Administrator view displaying registered users, their roles, and account status.",
+      "dependencies": ["api_user_mgmt", "fe_dashboard"],
+      "input": "User API list",
+      "output": "User directory table with role indicators",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Restricted to Administrator; lists users with active status."
+    },
+
+    {
+      "id": "test_auth",
+      "category": "Testing",
+      "name": "Authentication Tests",
+      "description": "Validates login, logout, token issuance, credential validation.",
+      "dependencies": ["api_auth"],
+      "input": "Valid and invalid credentials",
+      "output": "Test assertion results",
+      "status": "NOT_STARTED",
+      "validation_criteria": "All authentication unit and integration tests pass."
+    },
+    {
+      "id": "test_role_permissions",
+      "category": "Testing",
+      "name": "Role Authorization Tests",
+      "description": "Validates access control for Administrator, Engineer, and Supervisor across all endpoints.",
+      "dependencies": ["api_auth", "api_machines", "api_manuals", "api_supervisor_dashboard"],
+      "input": "Role-differentiated requests",
+      "output": "Test assertion results",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Endpoints return 403 when accessed by unauthorized roles."
+    },
+    {
+      "id": "test_manual_upload_denial",
+      "category": "Testing",
+      "name": "Mandatory Test 1: Engineer Upload Denial",
+      "description": "Engineer authenticates and attempts POST /api/manuals/upload/; backend must return HTTP 403 Forbidden with zero manuals created.",
+      "dependencies": ["api_manuals"],
+      "input": "Engineer user credentials + upload request",
+      "output": "HTTP 403 Forbidden assertion",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Status code == 403; no Manual record created in database."
+    },
+    {
+      "id": "test_machine_isolation",
+      "category": "Testing",
+      "name": "Mandatory Test 2: Machine Retrieval Isolation",
+      "description": "Creates chunks for M-HP200 and M-AC90. Query with M-HP200 returns zero M-AC90 chunks. Query with M-AC90 returns zero M-HP200 chunks.",
+      "dependencies": ["service_retrieval"],
+      "input": "Cross-machine search queries",
+      "output": "Strict isolation assertion results",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Zero leakage of passages across different machine codes."
+    },
+    {
+      "id": "test_pdf_extraction",
+      "category": "Testing",
+      "name": "PDF Extraction & 1-Based Page Preservation Tests",
+      "description": "Tests PyMuPDF text extraction across multiple pages, verifying that 1-based page indices are preserved.",
+      "dependencies": ["service_pdf_processor"],
+      "input": "Sample test PDF",
+      "output": "Extracted pages with 1-based indexing",
+      "status": "NOT_STARTED",
+      "validation_criteria": "First page is page 1 (not 0); text matches original page content."
+    },
+    {
+      "id": "test_embedding",
+      "category": "Testing",
+      "name": "Embedding & Vector Store Tests",
+      "description": "Validates vector generation, storage, idempotent upserting, and cosine similarity query.",
+      "dependencies": ["service_embedding", "service_vector_store"],
+      "input": "Sample texts and embeddings",
+      "output": "Vector store query results",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Vectors store and retrieve correctly; running twice does not duplicate."
+    },
+    {
+      "id": "test_rag_grounding",
+      "category": "Testing",
+      "name": "RAG Grounding & Threshold Tests",
+      "description": "Verifies that answers are strictly grounded in retrieved evidence, and out-of-scope questions return insufficient evidence.",
+      "dependencies": ["service_rag_orchestration"],
+      "input": "In-scope and out-of-scope technical questions",
+      "output": "Grounded answer vs INSUFFICIENT_EVIDENCE response",
+      "status": "NOT_STARTED",
+      "validation_criteria": "System prompt strictly obeyed; unsupported questions flagged as INSUFFICIENT_EVIDENCE."
+    },
+    {
+      "id": "test_citation_validation",
+      "category": "Testing",
+      "name": "Citation Validation Tests",
+      "description": "Verifies citation service cross-references LLM output against retrieved chunks and generates working #page=X URLs.",
+      "dependencies": ["service_citation"],
+      "input": "Passages and citations",
+      "output": "Verified citations with valid URLs",
+      "status": "NOT_STARTED",
+      "validation_criteria": "Hallucinated citation IDs are rejected; valid ones have correct document and page."
+    },
+    {
+      "id": "test_history_persistence",
+      "category": "Testing",
+      "name": "Question History Persistence Tests",
+      "description": "Verifies that every question, answer, status, and citation source is persisted in QuestionHistory.",
+      "dependencies": ["api_question_history"],
+      "input": "Simulated question submissions",
+      "output": "Database query assertion results",
+      "status": "NOT_STARTED",
+      "validation_criteria": "All questions stored; Supervisor can inspect; Engineer sees only own."
+    },
+    {
+      "id": "test_end_to_end",
+      "category": "Testing",
+      "name": "End-to-End Workflow & 5 Demonstration Scenarios",
+      "description": "Validates the 5 competition demonstration scenarios: 1) Supported question (E17), 2) Multi-document question (HP200 ops+maint), 3) Machine isolation, 4) Unsupported question, 5) Role security.",
+      "dependencies": [
+        "test_auth",
+        "test_role_permissions",
+        "test_manual_upload_denial",
+        "test_machine_isolation",
+        "test_rag_grounding"
+      ],
+      "input": "End-to-end scenario test runner",
+      "output": "Comprehensive test report",
+      "status": "NOT_STARTED",
+      "validation_criteria": "All 5 scenarios pass with full evidence verification and zero regressions."
+    }
+  ]
+}

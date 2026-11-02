@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Administrator Control Panel{% endblock %}
+{% block page_heading %}Administrator System Operations{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Register New Machine Form -->
+  <div class="col-12 col-lg-5">
+    <div class="industrial-card p-4">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-plus-square-fill text-primary fs-4"></i>
+        <h5 class="fw-bold mb-0">Register Manufacturing Machine</h5>
+      </div>
+      <p class="text-muted small">
+        Add new machine units into the system registry. Once registered, administrators can attach operation and maintenance PDF manuals.
+      </p>
+
+      <form id="admin-create-machine-form">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Machine Code / ID *</label>
+          <input type="text" class="form-control form-control-sm" id="new-machine-code" placeholder="e.g. M-CNC400" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Machine Name / Model *</label>
+          <input type="text" class="form-control form-control-sm" id="new-machine-name" placeholder="e.g. 5-Axis CNC Milling Center" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Manufacturer</label>
+          <input type="text" class="form-control form-control-sm" id="new-machine-manufacturer" placeholder="e.g. Apex Machining Systems">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Description</label>
+          <textarea class="form-control form-control-sm" id="new-machine-desc" rows="2" placeholder="Machine operational description..."></textarea>
+        </div>
+
+        <button type="submit" id="admin-create-machine-btn" class="btn btn-primary w-100 py-2 small fw-semibold">
+          <i class="bi bi-check-circle me-1"></i> Register Machine
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Registered Machines & User Management -->
+  <div class="col-12 col-lg-7">
+    <!-- Machines Table -->
+    <div class="industrial-card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cpu text-primary me-2"></i>Active Machine Fleet</span>
+        <a href="/manuals/" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Manuals
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Code</th>
+              <th>Name</th>
+              <th>Manufacturer</th>
+              <th>Manuals</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in machines %}
+            <tr>
+              <td><strong>{{ m.machine_code }}</strong></td>
+              <td>{{ m.machine_name }}</td>
+              <td><span class="text-secondary small">{{ m.manufacturer|default:"Standard" }}</span></td>
+              <td><span class="badge bg-secondary">{{ m.manuals.count }} manual{{ m.manuals.count|pluralize }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No machines registered.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Quick User Directory -->
+    <div class="industrial-card">
+      <div class="card-header">
+        <i class="bi bi-people text-primary me-2"></i>User Accounts & Authorization
+      </div>
+      <div class="p-3">
+        <div class="row g-2">
+          <div class="col-sm-4">
+            <div class="p-2 border rounded bg-light">
+              <span class="badge bg-danger mb-1">Administrator</span>
+              <div class="small fw-bold">admin_demo</div>
+              <small class="text-muted">Full administrative control</small>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="p-2 border rounded bg-light">
+              <span class="badge bg-primary mb-1">Engineer</span>
+              <div class="small fw-bold">engineer_demo</div>
+              <small class="text-muted">Interactive Q&A & history</small>
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <div class="p-2 border rounded bg-light">
+              <span class="badge bg-warning text-dark mb-1">Supervisor</span>
+              <div class="small fw-bold">supervisor_demo</div>
+              <small class="text-muted">Audit trail & flagged logs</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('admin-create-machine-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('new-machine-code').value.trim();
+  const name = document.getElementById('new-machine-name').value.trim();
+  const mfr = document.getElementById('new-machine-manufacturer').value.trim();
+  const desc = document.getElementById('new-machine-desc').value.trim();
+  const btn = document.getElementById('admin-create-machine-btn');
+
+  btn.disabled = true;
+  try {
+    const resp = await App.apiFetch('/api/machines/', {
+      method: 'POST',
+      body: { machine_code: code, machine_name: name, manufacturer: mfr, description: desc }
+    });
+    if (!resp) return;
+    const data = await resp.json();
+    if (resp.ok) {
+      App.showToast(`Machine ${data.machine_code} registered!`, 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      App.showToast(data.detail || 'Failed to register machine.', 'danger');
+    }
+  } catch (err) {
+    App.showToast(err.message, 'danger');
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+{% endblock %}

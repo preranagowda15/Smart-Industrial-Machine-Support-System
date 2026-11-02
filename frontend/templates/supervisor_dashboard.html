@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Supervisor Overview{% endblock %}
+{% block page_heading %}Supervisor Intelligence & Audit Overview{% endblock %}
+
+{% block content %}
+<div id="supervisor-dashboard-container">
+  <!-- Analytics Metric Cards -->
+  <div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="industrial-card p-3 d-flex align-items-center gap-3">
+        <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-3">
+          <i class="bi bi-chat-left-dots-fill fs-3"></i>
+        </div>
+        <div>
+          <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Total Queries</small>
+          <h3 id="metric-total-questions" class="fw-bold mb-0 text-dark">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="industrial-card p-3 d-flex align-items-center gap-3">
+        <div class="rounded-3 bg-success bg-opacity-10 text-success p-3">
+          <i class="bi bi-check-circle-fill fs-3"></i>
+        </div>
+        <div>
+          <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Grounded Answers</small>
+          <h3 id="metric-answered-questions" class="fw-bold mb-0 text-success">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="industrial-card p-3 d-flex align-items-center gap-3">
+        <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-3">
+          <i class="bi bi-exclamation-triangle-fill fs-3"></i>
+        </div>
+        <div>
+          <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Insufficient Evidence</small>
+          <h3 id="metric-insufficient-questions" class="fw-bold mb-0 text-warning">0</h3>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="industrial-card p-3 d-flex align-items-center gap-3">
+        <div class="rounded-3 bg-info bg-opacity-10 text-info p-3">
+          <i class="bi bi-pie-chart-fill fs-3"></i>
+        </div>
+        <div>
+          <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Grounding Rate</small>
+          <h3 id="metric-answer-rate" class="fw-bold mb-0 text-info">0.0%</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    <!-- Machine Distribution Table -->
+    <div class="col-12 col-lg-5">
+      <div class="industrial-card">
+        <div class="card-header">
+          <i class="bi bi-cpu text-primary me-2"></i>Activity Breakdown by Machine
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Machine Code</th>
+                <th>Model</th>
+                <th>Total</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="supervisor-machine-stats-body">
+              <tr>
+                <td colspan="4" class="text-center text-muted py-3">Loading stats...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Unanswered / Insufficient Evidence Review -->
+    <div class="col-12 col-lg-7">
+      <div class="industrial-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div>
+            <i class="bi bi-flag-fill text-warning me-2"></i>Flagged & Insufficient Evidence Queries
+          </div>
+          <span class="badge bg-warning text-dark">Requires Review</span>
+        </div>
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>When</th>
+                <th>User</th>
+                <th>Machine</th>
+                <th>Question</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="supervisor-unanswered-body">
+              <tr>
+                <td colspan="5" class="text-center text-muted py-3">Loading flagged queries...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/dashboard.js' %}"></script>
+{% endblock %}

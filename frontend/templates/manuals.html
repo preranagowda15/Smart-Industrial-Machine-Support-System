@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Machine Manuals{% endblock %}
+{% block page_heading %}Registered Machine Manuals{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  {% if user.role == "ADMIN" or user.is_superuser %}
+  <!-- Administrator Upload Card -->
+  <div class="col-12 col-lg-4">
+    <div class="industrial-card p-4">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-cloud-arrow-up text-primary fs-4"></i>
+        <h5 class="fw-bold mb-0">Upload PDF Manual</h5>
+      </div>
+      <p class="text-muted small">
+        Only Administrators can upload and index manuals. The server extracts pages with PyMuPDF, generates vector embeddings, and links the manual to the machine.
+      </p>
+
+      <div id="upload-status-alert" class="alert d-none small py-2 px-3 mb-3"></div>
+
+      <form id="manual-upload-form" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Target Machine *</label>
+          <select class="form-select form-select-sm" name="machine_id" required>
+            <option value="">-- Choose Machine --</option>
+            {% for m in machines %}
+              <option value="{{ m.machine_code }}">{{ m.machine_code }} &mdash; {{ m.machine_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Document ID / Name *</label>
+          <input type="text" class="form-control form-control-sm" name="document_name" placeholder="e.g. HP-OPS-02" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Revision Number *</label>
+          <input type="text" class="form-control form-control-sm" name="revision" value="1.0" required>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">PDF File * (Max 25 MB)</label>
+          <input type="file" class="form-control form-control-sm" name="pdf_file" accept="application/pdf" required>
+        </div>
+
+        <button type="submit" id="manual-upload-btn" class="btn btn-primary w-100 py-2 small fw-semibold">
+          <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload & Index Manual
+        </button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <!-- Read-only advisory card for non-admin -->
+  <div class="col-12 col-lg-3">
+    <div class="industrial-card p-4">
+      <div class="d-flex align-items-center gap-2 mb-2 text-secondary">
+        <i class="bi bi-shield-lock-fill fs-4 text-warning"></i>
+        <h6 class="fw-bold mb-0">Role Permissions</h6>
+      </div>
+      <p class="text-muted small mb-0">
+        You are signed in as an <strong>{{ user.get_role_display }}</strong>.
+        Manual ingestion is strictly restricted to Administrators. 
+        You have full access to search and view existing indexed manuals.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Manuals List Table -->
+  <div class="{% if user.role == 'ADMIN' or user.is_superuser %}col-12 col-lg-8{% else %}col-12 col-lg-9{% endif %}">
+    <div class="industrial-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Active Manual Documents</span>
+        <span class="badge bg-secondary">{{ manuals.count }} Document{{ manuals.count|pluralize }}</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Document ID</th>
+              <th>Machine</th>
+              <th>Rev</th>
+              <th>Pages</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in manuals %}
+            <tr>
+              <td>
+                <div class="fw-bold text-dark">{{ m.document_name }}</div>
+                <small class="text-muted">{{ m.original_filename|default:m.pdf_file.name }}</small>
+              </td>
+              <td>
+                <span class="badge bg-light text-dark border">{{ m.machine.machine_code }}</span>
+                <div class="small text-muted">{{ m.machine.machine_name }}</div>
+              </td>
+              <td><span class="badge bg-secondary">{{ m.revision }}</span></td>
+              <td>{{ m.total_pages }}</td>
+              <td>
+                {% if m.ingestion_status == "COMPLETED" %}
+                  <span class="badge bg-success-subtle text-success border border-success-subtle">
+                    <i class="bi bi-check-circle-fill me-1"></i>Indexed
+                  </span>
+                {% elif m.ingestion_status == "PROCESSING" %}
+                  <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                    <span class="spinner-border spinner-border-sm me-1"></span>Indexing
+                  </span>
+                {% elif m.ingestion_status == "FAILED" %}
+                  <span class="badge bg-danger-subtle text-danger border border-danger-subtle" title="{{ m.error_message }}">
+                    <i class="bi bi-x-circle-fill me-1"></i>Failed
+                  </span>
+                {% else %}
+                  <span class="badge bg-secondary">Pending</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if m.pdf_file %}
+                <a href="{{ m.pdf_file.url }}#page=1" target="_blank" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>Open PDF
+                </a>
+                {% endif %}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="6" class="text-center text-muted py-4">No manuals registered yet.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/manuals.js' %}"></script>
+{% endblock %}
