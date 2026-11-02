@@ -114,20 +114,31 @@ document.addEventListener("DOMContentLoaded", () => {
         <div class="mt-3 pt-2 border-top">
           <div class="small fw-bold text-secondary mb-2"><i class="bi bi-journal-bookmark-fill me-1"></i>Verifiable Manual Sources:</div>
           <div class="d-flex flex-column gap-2">
-            ${data.source_references.map(src => `
-              <div class="citation-card">
-                <div class="d-flex justify-content-between align-items-center">
-                  <div>
-                    <strong>Source:</strong> ${src.document_name} (Rev ${src.revision}) &bull; 
-                    <span class="badge bg-secondary">PDF Page ${src.pdf_page}</span>
+            ${data.source_references.map(src => {
+              const hasLinePrefix = src.passage_text && src.passage_text.startsWith("[Lines ");
+              const lineBadge = hasLinePrefix 
+                ? `<span class="badge bg-primary ms-1">${src.passage_text.slice(1, src.passage_text.indexOf(']'))}</span>` 
+                : '';
+              const cleanPassage = hasLinePrefix 
+                ? src.passage_text.slice(src.passage_text.indexOf(']\n') + 2) 
+                : src.passage_text;
+
+              return `
+                <div class="citation-card">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                      <strong>Source:</strong> ${src.document_name} (Rev ${src.revision}) &bull; 
+                      <span class="badge bg-secondary">PDF Page ${src.pdf_page}</span>
+                      ${lineBadge}
+                    </div>
+                    <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>Open PDF Page
+                    </a>
                   </div>
-                  <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">
-                    <i class="bi bi-box-arrow-up-right me-1"></i>Open PDF Page
-                  </a>
+                  <div class="passage-text">"${cleanPassage}"</div>
                 </div>
-                <div class="passage-text">"${src.passage_text}"</div>
-              </div>
-            `).join("")}
+              `;
+            }).join("")}
           </div>
         </div>
       `;

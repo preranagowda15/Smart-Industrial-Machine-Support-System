@@ -87,13 +87,18 @@ class AskAssistantAPIView(APIView):
                         machine=machine
                     ).first()
 
+                    passage = cit.get("supporting_passage", "")
+                    line_r = cit.get("line_range", "")
+                    if line_r and not passage.startswith("[Lines"):
+                        passage = f"[Lines {line_r}]\n{passage}"
+
                     SourceReference.objects.create(
                         question_history=question_log,
                         manual=manual_match,
                         document_name=cit.get("document_name") or cit.get("document_id"),
                         revision=cit.get("revision", "1.0"),
                         pdf_page=cit.get("pdf_page", 1),
-                        passage_text=cit.get("supporting_passage", ""),
+                        passage_text=passage,
                         pdf_url=cit.get("pdf_url", "")
                     )
 
