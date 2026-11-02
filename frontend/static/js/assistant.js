@@ -105,14 +105,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const isAnswered = data.status === "ANSWERED";
     const statusClass = isAnswered ? "message-answered" : "message-insufficient";
     const badgeHtml = isAnswered
-      ? `<span class="badge badge-answered me-2"><i class="bi bi-check-circle-fill me-1"></i>ANSWERED</span>`
-      : `<span class="badge badge-insufficient me-2"><i class="bi bi-exclamation-triangle-fill me-1"></i>INSUFFICIENT EVIDENCE</span>`;
+      ? `<span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>ANSWERED</span>`
+      : `<span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>INSUFFICIENT EVIDENCE</span>`;
 
     let citationsHtml = "";
     if (data.source_references && data.source_references.length > 0) {
       citationsHtml = `
         <div class="mt-3 pt-2 border-top">
-          <div class="small fw-bold text-secondary mb-2"><i class="bi bi-journal-bookmark-fill me-1"></i>Verifiable Manual Sources:</div>
+          <div class="d-flex align-items-center justify-content-between mb-2">
+            <small class="text-secondary fw-bold text-uppercase">
+              <i class="bi bi-journal-bookmark-fill text-primary me-1"></i>Verified Manual Sources & Citations:
+            </small>
+          </div>
           <div class="d-flex flex-column gap-2">
             ${data.source_references.map(src => {
               const hasLinePrefix = src.passage_text && src.passage_text.startsWith("[Lines ");
@@ -124,18 +128,20 @@ document.addEventListener("DOMContentLoaded", () => {
                 : src.passage_text;
 
               return `
-                <div class="citation-card">
-                  <div class="d-flex justify-content-between align-items-center">
+                <div class="citation-card p-2 bg-light rounded border">
+                  <div class="d-flex justify-content-between align-items-center mb-1">
                     <div>
-                      <strong>Source:</strong> ${src.document_name} (Rev ${src.revision}) &bull; 
+                      <strong class="text-dark">${src.document_name}</strong> (Rev ${src.revision}) &bull; 
                       <span class="badge bg-secondary">PDF Page ${src.pdf_page}</span>
                       ${lineBadge}
                     </div>
-                    <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2">
+                    <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" title="Open PDF Page in new tab">
                       <i class="bi bi-box-arrow-up-right me-1"></i>Open PDF Page
                     </a>
                   </div>
-                  <div class="passage-text">"${cleanPassage}"</div>
+                  <div class="passage-text text-muted small fst-italic ps-2 border-start border-2 border-secondary border-opacity-50">
+                    "${cleanPassage}"
+                  </div>
                 </div>
               `;
             }).join("")}
@@ -145,18 +151,31 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const el = document.createElement("div");
-    el.className = `message-bubble message-assistant ${statusClass}`;
+    el.className = `message-bubble message-assistant ${statusClass} shadow-sm`;
     el.innerHTML = `
       <div class="d-flex align-items-center mb-2">
         ${badgeHtml}
         <small class="text-muted ms-auto">${new Date().toLocaleTimeString()}</small>
       </div>
-      <div class="answer-content">${data.answer}</div>
+      
+      <!-- Primary Highlighted Answer Card -->
+      <div class="p-3 my-2 rounded-3 bg-white border border-primary border-opacity-50 shadow-sm" style="background-color: #f8fafc !important;">
+        <div class="d-flex align-items-center gap-2 mb-2 text-primary fw-bold small">
+          <i class="bi bi-robot fs-5"></i>
+          <span class="text-uppercase tracking-wider">AI Assistant Answer:</span>
+        </div>
+        <div class="fs-6 text-dark fw-semibold lh-base" style="font-size: 1.05rem !important; color: #0f172a !important;">
+          ${data.answer}
+        </div>
+      </div>
+
       ${citationsHtml}
     `;
 
     chatMessages.appendChild(el);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
   }
 
   async function submitQuestion() {

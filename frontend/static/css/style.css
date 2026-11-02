@@ -85,13 +85,18 @@ body {
 
 /* Chat Assistant Container */
 .chat-container {
-  height: calc(100vh - 270px);
-  min-height: 480px;
+  height: calc(100vh - 220px);
+  min-height: 520px;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
   border-radius: 8px;
   display: flex;
   flex-direction: column;
+}
+
+.answer-card-box {
+  background: #f8fafc;
+  border-left: 4px solid var(--accent-blue) !important;
 }
 
 .chat-messages {
