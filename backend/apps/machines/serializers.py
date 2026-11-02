@@ -17,3 +17,4 @@ class MachineSerializer(serializers.ModelSerializer):
             "manual_count",
         ]
         read_only_fields = ["id", "created_at", "manual_count"]
+

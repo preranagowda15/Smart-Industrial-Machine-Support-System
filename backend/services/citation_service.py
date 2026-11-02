@@ -61,3 +61,4 @@ class CitationService:
             })
 
         return verified
+

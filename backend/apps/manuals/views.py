@@ -176,3 +176,4 @@ class ManualUploadAPIView(APIView):
                 "detail": f"Manual ingestion failed: {exc}",
                 "ingestion_status": "FAILED"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

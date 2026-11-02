@@ -38,3 +38,4 @@ class QuestionHistorySerializer(serializers.ModelSerializer):
             "source_references",
         ]
         read_only_fields = ["id", "timestamp"]
+

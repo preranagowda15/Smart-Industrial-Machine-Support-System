@@ -71,3 +71,4 @@ if __name__ == "__main__":
         r = role_map.get(choice, choice.upper() or "ENGINEER")
         e = input("Enter Email (optional): ").strip()
         register_user(u, p, r, e)
+

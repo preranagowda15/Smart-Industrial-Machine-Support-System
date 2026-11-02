@@ -7,3 +7,4 @@ urlpatterns = [
     path("<int:pk>/", ManualDetailAPIView.as_view(), name="manual-detail"),
     path("<int:pk>/status/", ManualStatusAPIView.as_view(), name="manual-status"),
 ]
+

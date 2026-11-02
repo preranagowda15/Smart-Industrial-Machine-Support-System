@@ -36,3 +36,4 @@ if __name__ == "__main__":
     u = sys.argv[1] if len(sys.argv) > 1 else "admin"
     p = sys.argv[2] if len(sys.argv) > 2 else "AdminPassword!2026"
     create_admin(username=u, password=p)
+

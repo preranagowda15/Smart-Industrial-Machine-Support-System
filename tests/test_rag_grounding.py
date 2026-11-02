@@ -45,3 +45,4 @@ class RAGGroundingTests(TestCase):
             expected_machine_code="M-AC90"  # Expecting AC-90, but hit is HP-200
         )
         self.assertEqual(len(citations), 0, "Mismatched machine hit must be rejected")
+

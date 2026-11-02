@@ -95,3 +95,4 @@ class RolePermissionsTests(TestCase):
         """Unauthenticated requests to protected endpoints return 401."""
         response = self.client.get("/api/machines/")
         self.assertEqual(response.status_code, 401)
+

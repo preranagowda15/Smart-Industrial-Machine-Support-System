@@ -169,3 +169,4 @@ class EndToEndScenariosTests(TestCase):
         hist_resp = self.client.get("/api/supervisor/questions/")
         self.assertEqual(hist_resp.status_code, 200)
         self.assertIsInstance(hist_resp.data, list)
+

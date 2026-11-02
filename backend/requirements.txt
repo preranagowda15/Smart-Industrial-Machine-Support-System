@@ -9,3 +9,4 @@ openai>=1.50,<4.0
 requests>=2.30,<3.0
 numpy>=1.26,<3.0
 psycopg[binary]>=3.2,<4.0
+

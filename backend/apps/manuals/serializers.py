@@ -45,3 +45,4 @@ class DocumentChunkSerializer(serializers.ModelSerializer):
             "embedding_id",
             "created_at",
         ]
+

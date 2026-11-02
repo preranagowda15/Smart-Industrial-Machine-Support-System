@@ -44,3 +44,4 @@ class QuestionHistoryDetailAPIView(APIView):
             history_item = get_object_or_404(qs, pk=pk)
 
         return Response(QuestionHistorySerializer(history_item).data)
+

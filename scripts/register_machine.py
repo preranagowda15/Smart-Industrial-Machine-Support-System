@@ -59,3 +59,4 @@ if __name__ == "__main__":
         mfr = input("Enter Manufacturer (default: Apex Machining Systems): ").strip() or "Apex Machining Systems"
         desc = input("Enter Description (optional): ").strip()
         register_machine(code, name, mfr, desc)
+

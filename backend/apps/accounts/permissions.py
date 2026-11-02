@@ -41,3 +41,4 @@ class IsSupervisor(BasePermission):
             request.user.role in ("SUPERVISOR", "ADMIN") or
             getattr(request.user, "is_superuser", False)
         )
+

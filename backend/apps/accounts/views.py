@@ -6,8 +6,39 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import User
-from .serializers import UserSerializer, LoginSerializer
+from .serializers import UserSerializer, LoginSerializer, RegisterSerializer
 from .permissions import IsAdministrator
+
+class RegisterAPIView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if not serializer.is_valid():
+            errors = []
+            for field, errs in serializer.errors.items():
+                if isinstance(errs, list):
+                    errors.append(f"{field.capitalize()}: {errs[0]}")
+                else:
+                    errors.append(f"{field.capitalize()}: {errs}")
+            return Response({"detail": " | ".join(errors), "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = serializer.save()
+
+        # Automatically log user in
+        login(request, user)
+
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        refresh["role"] = user.role
+        refresh["username"] = user.username
+
+        return Response({
+            "message": "Registration successful.",
+            "user": UserSerializer(user).data,
+            "access_token": str(refresh.access_token),
+            "refresh_token": str(refresh),
+        }, status=status.HTTP_201_CREATED)
 
 class LoginAPIView(APIView):
     permission_classes = [AllowAny]

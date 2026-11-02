@@ -22,3 +22,4 @@ Write-Host "Press Ctrl+C to stop the server." -ForegroundColor Gray
 Write-Host "========================================================`n" -ForegroundColor Cyan
 
 & $pythonExe manage.py runserver 127.0.0.1:8000
+

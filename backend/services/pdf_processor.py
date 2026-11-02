@@ -62,3 +62,4 @@ class PDFProcessor:
             return len(doc)
         finally:
             doc.close()
+

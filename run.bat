@@ -29,3 +29,4 @@ echo Press Ctrl+C in this window to stop the server.
 echo ========================================================
 %PYTHON% manage.py runserver 127.0.0.1:8000
 pause
+

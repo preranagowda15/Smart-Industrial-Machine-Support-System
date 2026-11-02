@@ -4,6 +4,7 @@ from .views import (
     SupervisorUnansweredAPIView,
     SupervisorMetricsAPIView,
     login_page,
+    register_page,
     logout_view,
     dashboard_home,
     assistant_page,
@@ -21,6 +22,7 @@ urlpatterns = [
 
     # Page Routes
     path("", dashboard_home, name="dashboard-home"),
+    path("register/", register_page, name="register"),
     path("login/", login_page, name="login"),
     path("logout/", logout_view, name="logout"),
     path("assistant/", assistant_page, name="assistant-page"),
@@ -29,3 +31,4 @@ urlpatterns = [
     path("supervisor/", supervisor_dashboard_page, name="supervisor-dashboard"),
     path("admin-panel/", admin_dashboard_page, name="admin-dashboard"),
 ]
+

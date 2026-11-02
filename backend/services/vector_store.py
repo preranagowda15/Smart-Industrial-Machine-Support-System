@@ -197,3 +197,4 @@ class VectorStoreService:
 
     def get_collection(self) -> VectorCollection:
         return self._collection
+

@@ -169,3 +169,4 @@ In the web interface:
 6. **Scenario 5 — Supervisor & Admin Roles**:
    - Sign in as **Supervisor** (`supervisor_demo` / `SupervisorDemo!2026`): Visit **Supervisor Overview** to review analytics and the flagged unanswered queries from Scenario 3 & 4.
    - Sign in as **Administrator** (`admin_demo` / `AdminDemo!2026`): Visit **Machine Manuals** to upload new manuals or register equipment.
+

@@ -77,6 +77,11 @@ def login_page(request):
         return redirect("dashboard-home")
     return render(request, "login.html")
 
+def register_page(request):
+    if request.user.is_authenticated:
+        return redirect("dashboard-home")
+    return render(request, "register.html")
+
 def logout_view(request):
     logout(request)
     return redirect("login")
@@ -148,3 +153,4 @@ def admin_dashboard_page(request):
         "manuals": manuals,
         "page_title": "Administrator Control"
     })
+

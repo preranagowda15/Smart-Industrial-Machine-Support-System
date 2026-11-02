@@ -143,3 +143,4 @@ def ingest(source_path: Path):
 if __name__ == "__main__":
     target = Path(sys.argv[1]) if len(sys.argv) > 1 else (BASE_DIR / "data")
     ingest(target)
+

@@ -67,3 +67,4 @@ class RetrievalService:
             })
 
         return hits
+

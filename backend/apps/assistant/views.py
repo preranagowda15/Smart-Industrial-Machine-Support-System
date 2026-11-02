@@ -109,3 +109,4 @@ class AskAssistantAPIView(APIView):
                 {"detail": f"Assistant execution error: {exc}", "question_id": question_log.id},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+

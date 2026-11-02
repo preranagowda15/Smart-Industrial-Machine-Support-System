@@ -49,3 +49,4 @@ class DocumentChunk(models.Model):
 
     def __str__(self):
         return f"{self.manual.document_name} p.{self.page_number} c.{self.chunk_index}"
+

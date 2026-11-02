@@ -46,3 +46,4 @@ class MachineDetailAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         machine = serializer.save()
         return Response(MachineSerializer(machine).data)
+

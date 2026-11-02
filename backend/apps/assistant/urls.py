@@ -4,3 +4,4 @@ from .views import AskAssistantAPIView
 urlpatterns = [
     path("ask/", AskAssistantAPIView.as_view(), name="assistant-ask"),
 ]
+
