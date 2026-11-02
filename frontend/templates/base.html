@@ -40,6 +40,26 @@
       </div>
 
       <ul class="nav nav-pills flex-column mb-auto mt-2">
+        {% if user.role == "ADMIN" or user.is_superuser %}
+        <li class="nav-item">
+          <a href="/admin-panel/" class="nav-link {% if request.path == '/admin-panel/' or request.path == '/' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> Admin Dashboard
+          </a>
+        </li>
+        {% elif user.role == "SUPERVISOR" %}
+        <li class="nav-item">
+          <a href="/supervisor/" class="nav-link {% if request.path == '/supervisor/' or request.path == '/' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> Supervisor Dashboard
+          </a>
+        </li>
+        {% else %}
+        <li class="nav-item">
+          <a href="/engineer-dashboard/" class="nav-link {% if request.path == '/engineer-dashboard/' or request.path == '/' %}active{% endif %}">
+            <i class="bi bi-speedometer2"></i> Engineer Dashboard
+          </a>
+        </li>
+        {% endif %}
+
         <li class="nav-item">
           <a href="/assistant/" class="nav-link {% if request.path == '/assistant/' %}active{% endif %}">
             <i class="bi bi-robot"></i> AI Assistant
@@ -57,15 +77,15 @@
         </li>
         {% if user.role in "SUPERVISOR,ADMIN" or user.is_superuser %}
         <li class="nav-item">
-          <a href="/supervisor/" class="nav-link {% if request.path == '/supervisor/' %}active{% endif %}">
-            <i class="bi bi-graph-up-arrow"></i> Supervisor Overview
+          <a href="/supervisor/" class="nav-link {% if request.path == '/supervisor/' and user.role != 'SUPERVISOR' %}active{% endif %}">
+            <i class="bi bi-graph-up-arrow"></i> Supervisor Audit
           </a>
         </li>
         {% endif %}
         {% if user.role == "ADMIN" or user.is_superuser %}
         <li class="nav-item">
-          <a href="/admin-panel/" class="nav-link {% if request.path == '/admin-panel/' %}active{% endif %}">
-            <i class="bi bi-sliders"></i> Admin Control
+          <a href="/admin-panel/" class="nav-link {% if request.path == '/admin-panel/' and user.role != 'ADMIN' %}active{% endif %}">
+            <i class="bi bi-sliders"></i> Fleet Control
           </a>
         </li>
         {% endif %}

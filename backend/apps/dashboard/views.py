@@ -7,9 +7,10 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
+from backend.apps.accounts.models import User
 from backend.apps.accounts.permissions import role_of, IsSupervisor, IsAdministrator
 from backend.apps.machines.models import Machine
-from backend.apps.manuals.models import Manual
+from backend.apps.manuals.models import Manual, DocumentChunk
 from backend.apps.history.models import QuestionHistory
 from backend.apps.history.serializers import QuestionHistorySerializer
 
@@ -94,7 +95,29 @@ def dashboard_home(request):
     elif role == "SUPERVISOR":
         return redirect("supervisor-dashboard")
     else:
-        return redirect("assistant-page")
+        return redirect("engineer-dashboard")
+
+@login_required
+def engineer_dashboard_page(request):
+    role = role_of(request.user)
+    machines = Machine.objects.filter(is_active=True).prefetch_related("manuals")
+    my_history = QuestionHistory.objects.filter(user=request.user).select_related("machine").order_by("-timestamp")
+    
+    total_my_questions = my_history.count()
+    answered_count = my_history.filter(status=QuestionHistory.Status.ANSWERED).count()
+    insufficient_count = my_history.filter(status=QuestionHistory.Status.INSUFFICIENT_EVIDENCE).count()
+    grounding_rate = round((answered_count / total_my_questions * 100), 1) if total_my_questions > 0 else 100.0
+
+    return render(request, "engineer_dashboard.html", {
+        "user_role": role,
+        "machines": machines,
+        "recent_questions": my_history[:6],
+        "total_my_questions": total_my_questions,
+        "answered_count": answered_count,
+        "insufficient_count": insufficient_count,
+        "grounding_rate": grounding_rate,
+        "page_title": "Engineer Dashboard",
+    })
 
 @login_required
 def assistant_page(request):
@@ -132,7 +155,7 @@ def history_page(request):
 def supervisor_dashboard_page(request):
     role = role_of(request.user)
     if role not in ("SUPERVISOR", "ADMIN"):
-        return redirect("assistant-page")
+        return redirect("dashboard-home")
     machines = Machine.objects.filter(is_active=True)
     return render(request, "supervisor_dashboard.html", {
         "user_role": role,
@@ -145,12 +168,17 @@ def admin_dashboard_page(request):
     role = role_of(request.user)
     if role != "ADMIN":
         return redirect("dashboard-home")
-    machines = Machine.objects.all()
+    machines = Machine.objects.all().prefetch_related("manuals")
     manuals = Manual.objects.all().select_related("machine")
+    users = User.objects.all().order_by("-created_at")
+    total_chunks = DocumentChunk.objects.count()
     return render(request, "admin_dashboard.html", {
         "user_role": role,
         "machines": machines,
         "manuals": manuals,
+        "users": users,
+        "total_users": users.count(),
+        "total_chunks": total_chunks,
         "page_title": "Administrator Control"
     })
 

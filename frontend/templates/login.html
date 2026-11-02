@@ -143,7 +143,15 @@
         if (resp.ok) {
           App.setTokens(data.access_token, data.refresh_token);
           App.showToast("Welcome back, " + data.user.username + "!", "success");
-          window.location.href = "/";
+          setTimeout(() => {
+            if (data.user && data.user.role === 'ADMIN') {
+              window.location.href = "/admin-panel/";
+            } else if (data.user && data.user.role === 'SUPERVISOR') {
+              window.location.href = "/supervisor/";
+            } else {
+              window.location.href = "/engineer-dashboard/";
+            }
+          }, 400);
         } else {
           errBox.textContent = data.non_field_errors?.[0] || data.detail || "Authentication failed. Check credentials.";
           errBox.classList.remove('d-none');

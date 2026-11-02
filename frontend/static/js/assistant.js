@@ -52,6 +52,21 @@ document.addEventListener("DOMContentLoaded", () => {
     updateChips();
   }
 
+  // Preselect machine or query from URL parameters if redirected from dashboard
+  const urlParams = new URLSearchParams(window.location.search);
+  const paramMachine = urlParams.get('machine');
+  const paramQ = urlParams.get('q');
+  if (paramMachine && machineSelect) {
+    machineSelect.value = paramMachine;
+    updateChips();
+  }
+  if (paramQ && questionInput) {
+    questionInput.value = paramQ;
+    setTimeout(() => {
+      submitQuestion();
+    }, 400);
+  }
+
   function addSystemMessage(html) {
     const el = document.createElement("div");
     el.className = "text-center my-2 text-muted small";

@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Engineer Dashboard{% endblock %}
+{% block page_heading %}Manufacturing Engineer Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+  <!-- Welcome Banner -->
+  <div class="col-12">
+    <div class="industrial-card p-4 bg-gradient-primary text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);">
+      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge bg-primary px-3 py-1"><i class="bi bi-tools me-1"></i>ENGINEER WORKSPACE</span>
+            <span class="badge bg-success bg-opacity-75">Isolated Vector RAG Active</span>
+          </div>
+          <h3 class="fw-bold mb-1 text-white">Welcome back, {{ user.username }}!</h3>
+          <p class="text-white-50 small mb-0">
+            Select a manufacturing machine below to query maintenance procedures, alarm codes, and operating parameters strictly grounded in official PDF manuals.
+          </p>
+        </div>
+        <div class="d-flex gap-2">
+          <a href="/assistant/" class="btn btn-primary fw-semibold px-4 py-2">
+            <i class="bi bi-robot me-1"></i> Launch AI Assistant
+          </a>
+          <a href="/history/" class="btn btn-outline-light px-3 py-2">
+            <i class="bi bi-clock-history me-1"></i> My History
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Metric KPI Cards -->
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="industrial-card p-3 d-flex align-items-center gap-3">
+      <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-3">
+        <i class="bi bi-cpu-fill fs-3"></i>
+      </div>
+      <div>
+        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Available Fleet</small>
+        <h3 class="fw-bold mb-0 text-dark">{{ machines.count }} Machines</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="industrial-card p-3 d-flex align-items-center gap-3">
+      <div class="rounded-3 bg-info bg-opacity-10 text-info p-3">
+        <i class="bi bi-chat-quote-fill fs-3"></i>
+      </div>
+      <div>
+        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Questions Asked</small>
+        <h3 class="fw-bold mb-0 text-dark">{{ total_my_questions }}</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="industrial-card p-3 d-flex align-items-center gap-3">
+      <div class="rounded-3 bg-success bg-opacity-10 text-success p-3">
+        <i class="bi bi-check-circle-fill fs-3"></i>
+      </div>
+      <div>
+        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Grounded Answers</small>
+        <h3 class="fw-bold mb-0 text-success">{{ answered_count }}</h3>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-sm-6 col-xl-3">
+    <div class="industrial-card p-3 d-flex align-items-center gap-3">
+      <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-3">
+        <i class="bi bi-shield-check fs-3"></i>
+      </div>
+      <div>
+        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Grounding Rate</small>
+        <h3 class="fw-bold mb-0 text-dark">{{ grounding_rate }}%</h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Machine Fleet Grid -->
+  <div class="col-12 col-lg-8">
+    <div class="industrial-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <i class="bi bi-grid-fill text-primary me-2"></i>Select Machine to Query
+        </div>
+        <small class="text-muted">Strict machine-isolated vector search</small>
+      </div>
+      <div class="p-3">
+        <div class="row g-3">
+          {% for m in machines %}
+          <div class="col-12 col-md-6">
+            <div class="card h-100 border rounded-3 p-3 shadow-none bg-light bg-opacity-50 hover-shadow transition">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <span class="badge bg-dark fw-bold px-2 py-1">{{ m.machine_code }}</span>
+                <span class="badge bg-secondary">
+                  <i class="bi bi-file-earmark-pdf me-1"></i>{{ m.manuals.count }} Manual{{ m.manuals.count|pluralize }}
+                </span>
+              </div>
+              <h5 class="fw-bold text-dark mb-1">{{ m.machine_name }}</h5>
+              <p class="text-muted small mb-2">
+                <i class="bi bi-building me-1"></i>{{ m.manufacturer|default:"Industrial Fleet" }}
+              </p>
+              <p class="text-secondary small mb-3 flex-grow-1" style="min-height: 40px;">
+                {{ m.description|default:"Standard manufacturing equipment."|truncatewords:16 }}
+              </p>
+              <div class="d-flex gap-2 pt-2 border-top">
+                <a href="/assistant/?machine={{ m.machine_code }}" class="btn btn-sm btn-primary flex-fill">
+                  <i class="bi bi-chat-left-text-fill me-1"></i> Ask Machine
+                </a>
+                <a href="/manuals/" class="btn btn-sm btn-outline-secondary" title="View PDF Manuals">
+                  <i class="bi bi-book-half"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+          {% empty %}
+          <div class="col-12 text-center py-4 text-muted">
+            <i class="bi bi-inbox fs-2 mb-2 d-block"></i>
+            No machines registered yet. Contact your administrator to add machines and manuals.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Ask / Info Box -->
+  <div class="col-12 col-lg-4">
+    <div class="industrial-card p-4 mb-4">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-lightning-charge-fill text-warning fs-4"></i>
+        <h5 class="fw-bold mb-0">Quick Ask</h5>
+      </div>
+      <p class="text-muted small mb-3">
+        Jump straight into technical queries with isolated grounding. Select your machine and ask directly:
+      </p>
+
+      <form id="quick-ask-form" onsubmit="handleQuickAsk(event)">
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Target Machine</label>
+          <select id="quick-machine-select" class="form-select form-select-sm" required>
+            {% for m in machines %}
+              <option value="{{ m.machine_code }}">{{ m.machine_code }} - {{ m.machine_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold text-secondary">Maintenance Question</label>
+          <textarea id="quick-question-input" class="form-control form-control-sm" rows="3" placeholder="e.g. What does Alarm E17 mean?" required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-sm w-100 py-2 fw-semibold">
+          <i class="bi bi-arrow-right-circle me-1"></i> Ask AI Assistant
+        </button>
+      </form>
+    </div>
+
+    <!-- Operating Principles -->
+    <div class="industrial-card p-3 border-start border-4 border-info">
+      <h6 class="fw-bold text-dark mb-2"><i class="bi bi-info-circle text-info me-1"></i> Grounding Guarantees</h6>
+      <ul class="small text-muted mb-0 ps-3">
+        <li><strong>Zero Fabrication:</strong> Answers derived solely from verified PDF passages.</li>
+        <li><strong>Machine Isolation:</strong> Queries never retrieve data from other machinery.</li>
+        <li><strong>Page Citations:</strong> Every answer links to exact 1-based PDF pages.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Recent Queries by Current Engineer -->
+  <div class="col-12">
+    <div class="industrial-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <i class="bi bi-clock-history text-primary me-2"></i>Your Recent Inquiries
+        </div>
+        <a href="/history/" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-arrow-up-right me-1"></i>Full History
+        </a>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 130px;">Time</th>
+              <th style="width: 120px;">Machine</th>
+              <th>Question</th>
+              <th style="width: 140px;">Status</th>
+              <th style="width: 110px;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in recent_questions %}
+            <tr>
+              <td class="small text-muted">{{ q.timestamp|date:"M d, H:i" }}</td>
+              <td><span class="badge bg-secondary">{{ q.machine.machine_code }}</span></td>
+              <td class="fw-semibold text-dark">{{ q.question|truncatechars:65 }}</td>
+              <td>
+                {% if q.status == "ANSWERED" %}
+                  <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>ANSWERED</span>
+                {% elif q.status == "INSUFFICIENT_EVIDENCE" %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i>UNANSWERED</span>
+                {% else %}
+                  <span class="badge bg-secondary">{{ q.status }}</span>
+                {% endif %}
+              </td>
+              <td>
+                <a href="/history/" class="btn btn-sm btn-outline-secondary py-0 px-2" title="View details and citations">
+                  <i class="bi bi-eye"></i> View
+                </a>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="5" class="text-center text-muted py-4">
+                You haven't asked any questions yet. Click "Launch AI Assistant" to start diagnosing machinery.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function handleQuickAsk(e) {
+  e.preventDefault();
+  const machine = document.getElementById('quick-machine-select').value;
+  const question = encodeURIComponent(document.getElementById('quick-question-input').value.trim());
+  window.location.href = `/assistant/?machine=${machine}&q=${question}`;
+}
+</script>
+{% endblock %}

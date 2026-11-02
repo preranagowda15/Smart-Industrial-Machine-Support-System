@@ -137,8 +137,14 @@
           App.setTokens(data.access_token, data.refresh_token);
           App.showToast("Account created successfully! Welcome " + data.user.username + "!", "success");
           setTimeout(() => {
-            window.location.href = "/";
-          }, 1000);
+            if (data.user && data.user.role === 'ADMIN') {
+              window.location.href = "/admin-panel/";
+            } else if (data.user && data.user.role === 'SUPERVISOR') {
+              window.location.href = "/supervisor/";
+            } else {
+              window.location.href = "/engineer-dashboard/";
+            }
+          }, 600);
         } else {
           errBox.textContent = data.detail || "Registration failed. Please check form inputs.";
           errBox.classList.remove('d-none');
@@ -154,3 +160,4 @@
   </script>
 </body>
 </html>
+

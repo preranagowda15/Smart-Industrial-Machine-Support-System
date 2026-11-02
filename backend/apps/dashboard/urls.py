@@ -7,6 +7,7 @@ from .views import (
     register_page,
     logout_view,
     dashboard_home,
+    engineer_dashboard_page,
     assistant_page,
     manuals_page,
     history_page,
@@ -22,6 +23,7 @@ urlpatterns = [
 
     # Page Routes
     path("", dashboard_home, name="dashboard-home"),
+    path("engineer-dashboard/", engineer_dashboard_page, name="engineer-dashboard"),
     path("register/", register_page, name="register"),
     path("login/", login_page, name="login"),
     path("logout/", logout_view, name="logout"),
