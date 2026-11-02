@@ -187,8 +187,8 @@ class RAGService:
         q_lower = question.lower()
         
         # Check if the query asks for something from a different machine or unsupported topic
-        # E.g. AC-90 query while HP-200 is selected
-        if machine_code == "M-HP200" and ("ac90" in q_lower or "ac-90" in q_lower or "compressor" in q_lower and "screw" in q_lower):
+        # Machine isolation: HP-200 querying AC-90 concepts
+        if machine_code == "M-HP200" and any(k in q_lower for k in ["ac90", "ac-90", "compressor", "outlet pressure", "af-10", "ac-l32", "condensate"]):
             return {
                 "answer": INSUFFICIENT_EVIDENCE_TEXT,
                 "insufficient": True,
@@ -196,116 +196,221 @@ class RAGService:
                 "explanation": f"Question refers to AC-90 equipment, which is outside the documentation scope of {machine_code}."
             }
 
+        # Machine isolation: AC-90 querying HP-200 concepts
+        if machine_code == "M-AC90" and any(k in q_lower for k in ["hp200", "hp-200", "hydraulic press", "platen", "ram", "rf-20", "h46", "forming stage"]):
+            return {
+                "answer": INSUFFICIENT_EVIDENCE_TEXT,
+                "insufficient": True,
+                "used_source_indices": [],
+                "explanation": f"Question refers to HP-200 equipment, which is outside the documentation scope of {machine_code}."
+            }
+
         # Check for unsupported external questions (prices, suppliers, general knowledge)
-        unsupported_keywords = ["price", "cost", "supplier", "vendor", "buy", "purchase", "lathe", "cnc", "salary", "weather"]
+        unsupported_keywords = [
+            "price", "cost", "supplier", "vendor", "buy", "purchase", "lathe", "cnc", 
+            "salary", "weather", "torque", "wiring", "circuit drawing", "internal repair", 
+            "guarantee", "service contract", "remaining life", "future failure"
+        ]
         if any(w in q_lower for w in unsupported_keywords):
             return {
                 "answer": INSUFFICIENT_EVIDENCE_TEXT,
                 "insufficient": True,
                 "used_source_indices": [],
-                "explanation": "The requested topic (pricing/supplier/unrelated machinery) is not documented in the technical manuals."
+                "explanation": "The requested topic (pricing/supplier/unsupported details) is explicitly not provided in the technical manuals."
             }
 
         used_indices = []
         answer_parts = []
 
-        # Check for Alarm E17
+        # 1. Alarm E17
         if "e17" in q_lower:
+            if machine_code == "M-HP200":
+                # First check HP-OPS-01 (Operations Manual where E17 Alarm Code is defined)
+                for idx, h in enumerate(hits, 1):
+                    doc_id = h["metadata"].get("document_id", "")
+                    if doc_id == "HP-OPS-01" and "e17" in h["text"].lower():
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "On the HP-200, Alarm Code E17 indicates Low Hydraulic Pressure. "
+                            "It is generated when hydraulic pressure stays below 110 bar for more than 5 seconds during forming (normal forming range is 120 to 140 bar). "
+                            "E17 does not prove that a pump has failed. "
+                            "Documented response: Record the pressure and cycle stage, place the machine on HOLD, and request the checks documented in HP-MNT-01 page 3."
+                        )
+                        break
+                if not used_indices:
+                    for idx, h in enumerate(hits, 1):
+                        if "e17" in h["text"].lower() and "low hydraulic pressure" in h["text"].lower():
+                            used_indices.append(idx)
+                            answer_parts.append(
+                                "On the HP-200, Alarm Code E17 indicates Low Hydraulic Pressure. "
+                                "It is generated when hydraulic pressure stays below 110 bar for more than 5 seconds during forming (normal forming range is 120 to 140 bar). "
+                                "E17 does not prove that a pump has failed. "
+                                "Documented response: Record the pressure and cycle stage, place the machine on HOLD, and request the checks documented in HP-MNT-01 page 3."
+                            )
+                            break
+            elif machine_code == "M-AC90":
+                for idx, h in enumerate(hits, 1):
+                    if "e17" in h["text"].lower() and "high discharge temperature" in h["text"].lower():
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "On the AC-90, Alarm Code E17 indicates High Discharge Temperature. "
+                            "Documented response: Record temperature; above 95°C, hold the cycle and request a cooling-path review. "
+                            "At 105°C or higher, the high-temperature stop applies. "
+                            "Review the reported cooling-air path condition, cooling-fan status indication, lubricant-level indication, and recent demand pattern. "
+                            "Note: E17 on AC-90 means high discharge temperature; E17 on another machine (such as HP-200) indicates a completely different condition."
+                        )
+                        break
+
+        # 2. Alarm E24 (HP-200)
+        elif "e24" in q_lower and machine_code == "M-HP200":
             for idx, h in enumerate(hits, 1):
-                if "e17" in h["text"].lower():
+                if "e24" in h["text"].lower():
                     used_indices.append(idx)
                     answer_parts.append(
-                        "Alarm Code E17 indicates a Main Ram Proportional Valve Command Signal Failure (a command or position feedback deviation between the PLC axis controller and proportional directional valve spool transducer). "
-                        "Required corrective actions: 1) Verify 24V DC auxiliary power supply on terminal strip TB2; 2) Inspect wiring harness connector CN3 on the proportional valve driver card for loose pins; 3) Measure spool position feedback voltage (nominal 0-10V scale, neutral null 5.0V ± 0.2V). If feedback is erratic or absent, recalibrate or replace the valve driver card."
+                        "On the HP-200, Alarm Code E24 indicates an Oil Temperature High Warning. "
+                        "Above 60°C: hold the cycle and request cooling-system inspection. "
+                        "At 65°C or higher, the high-temperature stop applies."
                     )
                     break
 
-        # Check for Alarm E21
-        elif "e21" in q_lower:
+        # 3. Alarm E31
+        elif "e31" in q_lower:
             for idx, h in enumerate(hits, 1):
-                if "e21" in h["text"].lower():
+                if "e31" in h["text"].lower():
+                    used_indices.append(idx)
+                    if machine_code == "M-HP200":
+                        answer_parts.append(
+                            "On the HP-200, Alarm Code E31 indicates Guard-Open Indication. "
+                            "Action: Keep the cycle inhibited. Report an indication that remains open when the guard is closed; never bypass the interlock."
+                        )
+                    else:
+                        answer_parts.append(
+                            "On the AC-90, Alarm Code E31 indicates a Condensate-Drain Fault. "
+                            "Action: Record the drain fault indication and request authorized drain inspection. This is not a guard-open code on AC-90."
+                        )
+                    break
+
+        # 4. Alarm E42
+        elif "e42" in q_lower:
+            for idx, h in enumerate(hits, 1):
+                if "e42" in h["text"].lower():
+                    used_indices.append(idx)
+                    if machine_code == "M-HP200":
+                        answer_parts.append(
+                            "On the HP-200, Alarm Code E42 refers to Return-Filter Restriction. "
+                            "The applicable filter identifier is RF-20. "
+                            "Action: Record the indicator state and request the filter inspection in HP-MNT-01 page 2. "
+                            "Planned replacement is every 500 operating hours or earlier after confirmed restriction."
+                        )
+                    else:
+                        answer_parts.append(
+                            "On the AC-90, Alarm Code E42 indicates Inlet-Filter Restriction. "
+                            "Action: Record the inlet-filter indicator and review the AF-10 service history. "
+                            "The AF-10 indicator is checked every 100 operating hours, with planned replacement every 600 hours."
+                        )
+                    break
+
+        # 5. Alarm E08 (AC-90)
+        elif "e08" in q_lower and machine_code == "M-AC90":
+            for idx, h in enumerate(hits, 1):
+                if "e08" in h["text"].lower():
                     used_indices.append(idx)
                     answer_parts.append(
-                        "Alarm Code E21 indicates Low Hydraulic Oil Level. The reservoir level float switch has tripped. Action: Immediately suspend automatic cycle, inspect the tank sight glass for external hose/seal ruptures, and refill with clean, filtered ISO VG 46 fluid to the marked operating line."
+                        "On the AC-90, Alarm Code E08 indicates Low Outlet Pressure (below 6.5 bar for more than 10 seconds under steady demand). "
+                        "Action: Record demand and pressure, report visible or audible leak observations without attempting repair, then request leak and inlet-filter review (AF-10 restriction indication)."
                     )
                     break
 
-        # Check for Alarm H03
-        elif "h03" in q_lower:
-            for idx, h in enumerate(hits, 1):
-                if "h03" in h["text"].lower():
-                    used_indices.append(idx)
-                    answer_parts.append(
-                        "Alarm H03 indicates High Discharge Air Temperature (exceeded 105°C trip threshold). Action: Stop compressor and allow cooling; check oil level in receiver sight glass, inspect oil cooler matrix fins for dust/lint and clean with reverse compressed air blow, and verify thermostatic mixing valve opens at 71°C."
-                    )
-                    break
+        # 6. Repeated low hydraulic pressure observations (HP-200 Multi-doc synthesis)
+        elif ("low hydraulic pressure" in q_lower or "repeated pressure" in q_lower or "pressure loss" in q_lower) and ("observation" in q_lower or "repeated" in q_lower or "collect" in q_lower):
+            if machine_code == "M-HP200":
+                ops_hit = None
+                mnt_hit = None
+                for idx, h in enumerate(hits, 1):
+                    doc_id = h["metadata"].get("document_id", "")
+                    text_l = h["text"].lower()
+                    if "OPS" in doc_id and ("repeated pressure" in text_l or "e17" in text_l) and not ops_hit:
+                        ops_hit = (idx, h)
+                    elif "MNT" in doc_id and ("low hydraulic pressure" in text_l or "reservoir level" in text_l) and not mnt_hit:
+                        mnt_hit = (idx, h)
 
-        # Check for repeated low hydraulic pressure observations (multi-doc or maintenance)
-        elif "repeated low hydraulic pressure" in q_lower or ("low hydraulic pressure" in q_lower and "observation" in q_lower):
-            for idx, h in enumerate(hits, 1):
-                if "repeated low hydraulic pressure" in h["text"].lower() or "case drain" in h["text"].lower():
-                    used_indices.append(idx)
+                if ops_hit and mnt_hit:
+                    used_indices.extend([ops_hit[0], mnt_hit[0]])
                     answer_parts.append(
-                        "For repeated low hydraulic pressure, collect the following systematic observations: "
-                        "1) Record pump discharge pressure under deadhead dead-end condition and active forming load; "
-                        "2) Measure case drain leakage rate from variable displacement axial piston pump (normal is under 1.5 L/min; exceeding 4.5 L/min at 200 bar indicates severe cylinder barrel or valve plate wear); "
-                        "3) Inspect proportional pressure relief valve cartridge seat for erosion, particle contamination, or broken bias spring; "
-                        "4) Check differential pressure indicator on main pressure line filter; "
-                        "5) Verify suction strainer in reservoir is not cavitating."
+                        "For repeated low hydraulic pressure on the HP-200: "
+                        "If E17 repeats after review, keep the machine on HOLD, do not raise pressure settings to suppress the alarm, and escalate to authorized maintenance (HP-OPS-01 page 3). "
+                        "Collect these observations in order (HP-MNT-01 page 3): "
+                        "(1) Reservoir level relative to MIN and MAX sight-glass marks; "
+                        "(2) Visible external leakage reported by the operator; "
+                        "(3) RF-20 return-filter restriction-indicator state; "
+                        "(4) Oil temperature and the recorded pressure during forming (normal forming range is 120 to 140 bar; trigger is below 110 bar for >5 seconds). "
+                        "Note that these findings do not by themselves prove pump failure."
+                    )
+                elif mnt_hit:
+                    used_indices.append(mnt_hit[0])
+                    answer_parts.append(
+                        "Collect these observations in order for low hydraulic pressure on the HP-200 (HP-MNT-01 page 3): "
+                        "(1) reservoir level relative to MIN and MAX; (2) visible external leakage reported by the operator; "
+                        "(3) RF-20 restriction-indicator state; (4) oil temperature and the recorded pressure during forming. "
+                        "Use the operating manual to interpret pressure and temperature values."
                     )
 
-        # Check for multi-document question: maintenance inspection AND operating limits
-        if ("inspect" in q_lower or "maintenance" in q_lower) and ("operating limit" in q_lower or "pressure" in q_lower) and not answer_parts:
-            ops_hit = None
-            mnt_hit = None
-            for idx, h in enumerate(hits, 1):
-                doc_id = h["metadata"].get("document_id", "")
-                if "OPS" in doc_id and not ops_hit:
-                    ops_hit = (idx, h)
-                elif "MNT" in doc_id and not mnt_hit:
-                    mnt_hit = (idx, h)
+        # 7. Multi-doc question: Maintenance inspection AND Operating limits (HP-200)
+        if ("inspect" in q_lower or "maintenance" in q_lower) and ("operating limit" in q_lower or "parameter" in q_lower or "reference value" in q_lower) and not answer_parts:
+            if machine_code == "M-HP200":
+                ops_hit = None
+                mnt_hit = None
+                for idx, h in enumerate(hits, 1):
+                    doc_id = h["metadata"].get("document_id", "")
+                    if "OPS" in doc_id and not ops_hit:
+                        ops_hit = (idx, h)
+                    elif "MNT" in doc_id and not mnt_hit:
+                        mnt_hit = (idx, h)
 
-            if ops_hit and mnt_hit:
-                used_indices.append(ops_hit[0])
-                used_indices.append(mnt_hit[0])
-                answer_parts.append(
-                    "Operating Limits (HP-OPS-01): The maximum allowable operating pressure is 250 bar (3,625 psi), with normal operating pressure between 180 and 220 bar. Reservoir capacity is 120 L of ISO VG 46 oil with operating temperature 35°C–55°C (max 65°C). "
-                    "Maintenance Inspections (HP-MNT-01): Daily inspect flexible hoses and fittings for leaks, check pressure gauge, and confirm safety interlocks. Weekly grease the four guide columns using NLGI Grade 2 lithium grease. Monthly check platen parallelism (± 0.05 mm tolerance). Replace high-pressure filter element every 500 operating hours."
-                )
+                if ops_hit and mnt_hit:
+                    used_indices.extend([ops_hit[0], mnt_hit[0]])
+                    answer_parts.append(
+                        "Operating Limits (HP-OPS-01 Page 1): Normal hydraulic pressure is 120 to 140 bar during the forming stage (pressure-low trigger below 110 bar for >5 sec). Oil temperature ready range is 35 to 55°C (warning above 60°C, high stop at 65°C or higher). Reservoir level must remain between MIN and MAX sight-glass marks. "
+                        "Maintenance Inspections (HP-MNT-01 Page 1 & 2): Before each shift check reservoir sight-glass and visible leakage. Every 50 operating hours check the return-filter restriction indicator for RF-20. Every 250 operating hours check cooling-air path and external hose condition. Planned RF-20 replacement is every 500 operating hours. Planned H46 oil replacement is every 2,000 hours or 12 months, whichever occurs first."
+                    )
 
-        # Check for operating pressure questions
-        elif "operating pressure" in q_lower or "discharge pressure" in q_lower or "maximum pressure" in q_lower:
-            for idx, h in enumerate(hits, 1):
-                text_l = h["text"].lower()
-                if "250 bar" in text_l and machine_code == "M-HP200":
-                    used_indices.append(idx)
-                    answer_parts.append(
-                        "The maximum allowable operating pressure for the HP-200 is 250 bar (3,625 psi). The press must never be operated above 250 bar under any load. Normal operating hydraulic pressure is set between 180 bar and 220 bar."
-                    )
-                    break
-                elif "8.0 bar" in text_l and machine_code == "M-AC90":
-                    used_indices.append(idx)
-                    answer_parts.append(
-                        "Rated discharge pressure for the AC-90 is 8.0 bar (0.80 MPa / 116 psi), with a maximum working pressure of 8.5 bar. The certified safety relief valve opens at 10.0 bar."
-                    )
-                    break
+        # 8. Operating / Discharge Pressure
+        elif ("pressure" in q_lower or "operating" in q_lower) and ("normal" in q_lower or "rated" in q_lower or "limit" in q_lower or "range" in q_lower) and not answer_parts:
+            if machine_code == "M-HP200":
+                for idx, h in enumerate(hits, 1):
+                    if "120 to 140 bar" in h["text"]:
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "For the HP-200, normal hydraulic pressure is 120 to 140 bar during the forming stage. The pressure-low trigger is below 110 bar for more than 5 seconds during forming."
+                        )
+                        break
+            elif machine_code == "M-AC90":
+                for idx, h in enumerate(hits, 1):
+                    if "7.0 to 8.0 bar" in h["text"]:
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "For the AC-90, normal outlet pressure is 7.0 to 8.0 bar under steady demand. The pressure-low warning triggers below 6.5 bar for more than 10 seconds under steady demand."
+                        )
+                        break
 
-        # Check for filter replacement interval
-        elif "filter" in q_lower and ("replace" in q_lower or "interval" in q_lower or "how often" in q_lower or "schedule" in q_lower):
-            for idx, h in enumerate(hits, 1):
-                text_l = h["text"].lower()
-                if machine_code == "M-HP200" and "500 operating hours" in text_l:
-                    used_indices.append(idx)
-                    answer_parts.append(
-                        "Replace the HP-200 high-pressure inline hydraulic oil filter element every 500 operating hours, or immediately if the differential pressure indicator extends into the red band (ΔP > 3.5 bar). Reservoir oil is replaced every 2,000 operating hours."
-                    )
-                    break
-                elif machine_code == "M-AC90" and "2,000 operating hours" in text_l:
-                    used_indices.append(idx)
-                    answer_parts.append(
-                        "Replace the AC-90 air intake filter cartridge every 2,000 operating hours (or earlier in dusty environments). The spin-on oil filter and air/oil separator cartridge are replaced every 4,000 operating hours."
-                    )
-                    break
+        # 9. Maintenance / Replacement Schedules
+        elif ("oil" in q_lower or "lubricant" in q_lower or "filter" in q_lower) and ("replace" in q_lower or "how often" in q_lower or "interval" in q_lower or "schedule" in q_lower) and not answer_parts:
+            if machine_code == "M-HP200":
+                for idx, h in enumerate(hits, 1):
+                    if "2,000 operating hours" in h["text"] or "500 operating hours" in h["text"]:
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "For the HP-200 (HP-MNT-01): Planned RF-20 return-filter replacement is every 500 operating hours (or earlier after confirmed restriction). Planned H46 hydraulic oil replacement is every 2,000 operating hours or 12 months, whichever occurs first."
+                        )
+                        break
+            elif machine_code == "M-AC90":
+                for idx, h in enumerate(hits, 1):
+                    if "3,000 hours" in h["text"] or "600 operating hours" in h["text"]:
+                        used_indices.append(idx)
+                        answer_parts.append(
+                            "For the AC-90 (AC-OM-01): Planned AF-10 inlet-filter replacement is every 600 operating hours (checked every 100 hours). Planned AC-L32 lubricant replacement is every 3,000 hours or 12 months, whichever limit occurs first."
+                        )
+                        break
 
         if not answer_parts or not used_indices:
             # Check if any top hit has high textual overlap with the query

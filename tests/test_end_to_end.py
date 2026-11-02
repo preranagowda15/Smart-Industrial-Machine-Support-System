@@ -53,7 +53,7 @@ class EndToEndScenariosTests(TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.data
         self.assertEqual(data["status"], "ANSWERED")
-        self.assertIn("Main Ram Proportional Valve", data["answer"])
+        self.assertIn("low hydraulic pressure", data["answer"].lower())
         self.assertTrue(len(data["source_references"]) > 0)
         
         source = data["source_references"][0]

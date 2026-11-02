@@ -12,7 +12,7 @@ class RAGGroundingTests(TestCase):
         """Supported question E17 returns grounded answer citing HP-OPS-01 page 2."""
         res = self.rag.ask("What does E17 mean?", machine_code="M-HP200", machine_name="HP-200")
         self.assertEqual(res["evidence_status"], "ANSWERED")
-        self.assertIn("Main Ram Proportional Valve", res["answer"])
+        self.assertIn("low hydraulic pressure", res["answer"].lower())
         self.assertTrue(len(res["citations"]) > 0)
         citation = res["citations"][0]
         self.assertEqual(citation["document_id"], "HP-OPS-01")
