@@ -16,4 +16,8 @@ vector_db/*
 !vector_db/.gitkeep
 .DS_Store
 Thumbs.db
-
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
