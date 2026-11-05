@@ -1,104 +1,114 @@
-from django.contrib.auth import login, logout
-from rest_framework import status
+from rest_framework import status, generics, permissions
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.tokens import RefreshToken
-
+from django.contrib.auth import login as django_login, logout as django_logout
 from .models import User
-from .serializers import UserSerializer, LoginSerializer, RegisterSerializer
-from .permissions import IsAdministrator
+from .serializers import UserSerializer, UserCreateSerializer, LoginSerializer
+from .permissions import IsAdminRole
 
-class RegisterAPIView(APIView):
-    permission_classes = [AllowAny]
 
-    def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        if not serializer.is_valid():
-            errors = []
-            for field, errs in serializer.errors.items():
-                if isinstance(errs, list):
-                    errors.append(f"{field.capitalize()}: {errs[0]}")
-                else:
-                    errors.append(f"{field.capitalize()}: {errs}")
-            return Response({"detail": " | ".join(errors), "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = serializer.save()
-
-        # Automatically log user in
-        login(request, user)
-
-        # Generate JWT tokens
-        refresh = RefreshToken.for_user(user)
-        refresh["role"] = user.role
-        refresh["username"] = user.username
-
-        return Response({
-            "message": "Registration successful.",
-            "user": UserSerializer(user).data,
-            "access_token": str(refresh.access_token),
-            "refresh_token": str(refresh),
-        }, status=status.HTTP_201_CREATED)
-
-class LoginAPIView(APIView):
-    permission_classes = [AllowAny]
+class LoginView(APIView):
+    """
+    POST /api/auth/login/
+    Authenticates user and returns JWT access/refresh tokens and user details.
+    Also logs the user into the Django session for traditional server-rendered views.
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user = serializer.validated_data["user"]
-        
-        # Django session login for browser cookie auth
-        login(request, user)
+        user = getattr(serializer, 'user', None)
+        if user:
+            try:
+                django_login(request, user)
+            except Exception:
+                pass
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
-        # JWT tokens for REST API clients
+
+class LogoutView(APIView):
+    """
+    POST /api/auth/logout/
+    Blacklists the refresh token if provided and logs out of Django session.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        refresh_token = request.data.get('refresh')
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                pass
+        try:
+            django_logout(request)
+        except Exception:
+            pass
+        return Response({"detail": "Successfully logged out."}, status=status.HTTP_200_OK)
+
+
+class MeView(APIView):
+    """
+    GET /api/auth/me/
+    Returns authenticated user's profile and role.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class RegisterView(APIView):
+    """
+    POST /api/auth/register/
+    Self-service registration (default role: OPERATOR).
+    """
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        if 'role' not in data or data['role'] not in [User.Role.OPERATOR, User.Role.ENGINEER]:
+            data['role'] = User.Role.OPERATOR
+
+        serializer = UserCreateSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        try:
+            django_login(request, user)
+        except Exception:
+            pass
+
         refresh = RefreshToken.for_user(user)
-        refresh["role"] = user.role
-        refresh["username"] = user.username
+        refresh['username'] = user.username
+        refresh['role'] = user.role
 
         return Response({
-            "message": "Login successful.",
-            "user": UserSerializer(user).data,
-            "access_token": str(refresh.access_token),
-            "refresh_token": str(refresh),
-        }, status=status.HTTP_200_OK)
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'user': UserSerializer(user).data
+        }, status=status.HTTP_201_CREATED)
 
-class LogoutAPIView(APIView):
-    permission_classes = [IsAuthenticated]
 
-    def post(self, request):
-        logout(request)
-        return Response({"message": "Successfully logged out."}, status=status.HTTP_200_OK)
+class UserListView(generics.ListCreateAPIView):
+    """
+    GET /api/users/
+    POST /api/users/
+    Administrative user management.
+    """
+    permission_classes = [permissions.IsAuthenticated, IsAdminRole]
+    queryset = User.objects.all().order_by('-date_joined')
+    serializer_class = UserSerializer
 
-class CurrentUserAPIView(APIView):
-    permission_classes = [IsAuthenticated]
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return UserCreateSerializer
+        return UserSerializer
 
-    def get(self, request):
-        return Response(UserSerializer(request.user).data)
-
-class UserListCreateAPIView(APIView):
-    permission_classes = [IsAuthenticated, IsAdministrator]
-
-    def get(self, request):
-        users = User.objects.all().order_by("-created_at")
-        return Response(UserSerializer(users, many=True).data)
-
-    def post(self, request):
-        username = request.data.get("username", "").strip()
-        email = request.data.get("email", "").strip()
-        password = request.data.get("password", "")
-        role = request.data.get("role", User.Role.ENGINEER)
-
-        if not username or not password:
-            return Response({"detail": "Username and password are required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if User.objects.filter(username=username).exists():
-            return Response({"detail": "A user with this username already exists."}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-            role=role
-        )
-        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+UserListCreateView = UserListView

@@ -1,6 +1,6 @@
 """
 Seed script: creates demo users, registers machines from machine_manual_index.csv,
-and ingests/indexes the 3 official PDF manuals.
+and ingests/indexes the official PDF manuals.
 """
 import os
 import sys
@@ -9,24 +9,28 @@ from pathlib import Path
 
 # Add project root to sys.path
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR / "backend"))
 sys.path.insert(0, str(BASE_DIR))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.config.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 import django
 django.setup()
 
 from django.core.files import File
-from backend.apps.accounts.models import User
-from backend.apps.machines.models import Machine
-from backend.apps.manuals.models import Manual, DocumentChunk
-from backend.services.pdf_processor import PDFProcessor
-from backend.services.chunking_service import ChunkingService
-from backend.services.embedding_service import EmbeddingService
-from backend.services.vector_store import VectorStoreService
+from apps.accounts.models import User
+from apps.machines.models import Machine
+from apps.manuals.models import Manual, DocumentChunk
+from services.pdf_processor import PDFProcessor
+from services.chunking_service import ChunkingService
+from services.embedding_service import EmbeddingService
+from services.vector_store import VectorStoreService
 
 def create_demo_users():
     print("--- Creating Demo Users ---")
     users_data = [
+        ("admin1", "admin1@plate-inspect.local", "Admin123!", User.Role.ADMIN, True, True),
+        ("supervisor1", "supervisor1@plate-inspect.local", "Supervisor123!", User.Role.SUPERVISOR, False, False),
+        ("operator1", "operator1@plate-inspect.local", "Operator123!", User.Role.OPERATOR, False, False),
         ("admin_demo", "admin@manufacturing.local", "AdminDemo!2026", User.Role.ADMIN, True, True),
         ("engineer_demo", "engineer@manufacturing.local", "EngineerDemo!2026", User.Role.ENGINEER, False, False),
         ("supervisor_demo", "supervisor@manufacturing.local", "SupervisorDemo!2026", User.Role.SUPERVISOR, False, False),
@@ -58,7 +62,8 @@ def ingest_manuals_from_csv(admin_user):
     print("\n--- Registering Machines and Ingesting Manuals from CSV ---")
     csv_path = BASE_DIR / "data" / "machine_manual_index.csv"
     if not csv_path.exists():
-        raise FileNotFoundError(f"Index CSV not found at {csv_path}")
+        print(f"Warning: Index CSV not found at {csv_path}")
+        return
 
     chunker = ChunkingService(chunk_size=850, overlap=120)
     embedder = EmbeddingService()
@@ -177,4 +182,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

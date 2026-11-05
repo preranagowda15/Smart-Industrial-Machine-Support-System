@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Admin & System Integrity{% endblock %}
+{% block page_title %}Admin Console & Model Integrity{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- User Management Section -->
+    <div class="col-lg-6 mb-4">
+        <!-- Create User Card -->
+        <div class="card card-industrial mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-person-plus me-2 text-primary"></i>Create New User</span>
+                <span class="badge bg-danger">Admin Only</span>
+            </div>
+            <div class="card-body">
+                <div id="create-user-alert" class="alert alert-success d-none" role="alert"></div>
+                <form id="create-user-form">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Username</label>
+                            <input type="text" class="form-control form-control-sm" id="new-username" required placeholder="e.g. operator2">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Password</label>
+                            <input type="password" class="form-control form-control-sm" id="new-password" required minlength="6" placeholder="Min 6 characters">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Email</label>
+                            <input type="email" class="form-control form-control-sm" id="new-email" placeholder="user@factory.local">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">System Role</label>
+                            <select class="form-select form-select-sm" id="new-role" required>
+                                <option value="OPERATOR">OPERATOR (Upload & Inspect)</option>
+                                <option value="SUPERVISOR">SUPERVISOR (Review & Evaluation)</option>
+                                <option value="ADMIN">ADMIN (Full Control)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" id="create-user-btn">
+                        <i class="bi bi-check2 me-1"></i> Register User
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Users List Card -->
+        <div class="card card-industrial">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-people me-2 text-primary"></i>Registered System Users</span>
+                <span class="badge bg-secondary" id="users-count-badge">0 Users</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <tr><td colspan="4" class="text-center py-3 text-muted">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Model Integrity & SHA256SUMS Section -->
+    <div class="col-lg-6 mb-4">
+        <div class="card card-industrial">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-check me-2 text-primary"></i>Model Integrity Verification</span>
+                <span class="badge bg-dark">SHA256SUMS.txt</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="fw-bold" id="integrity-status-text">Integrity Status: Checking...</div>
+                        <div class="text-muted small" id="integrity-sub-text">Verifying weights, metadata, labels, and fixtures.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="runIntegrityCheck()">
+                        <i class="bi bi-arrow-repeat me-1"></i> Verify Now
+                    </button>
+                </div>
+
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Checked</div>
+                            <div class="fw-bold fs-5 text-dark" id="int-total">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Matched</div>
+                            <div class="fw-bold fs-5 text-success" id="int-matched">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Mismatched</div>
+                            <div class="fw-bold fs-5 text-danger" id="int-mismatch">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold small text-uppercase text-secondary mb-2">Verified Files List</h6>
+                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0 font-monospace small">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>File Path</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="integrity-table-body">
+                            <tr><td colspan="2" class="text-center py-3 text-muted">Running integrity check...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadUsers() {
+        const tbody = document.getElementById('users-table-body');
+        const countBadge = document.getElementById('users-count-badge');
+
+        try {
+            const res = await apiFetch('/users/');
+            if (!res.ok) {
+                if (res.status === 403) {
+                    alert('Access Denied: Admin role required.');
+                    window.location.href = '/upload/';
+                    return;
+                }
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-danger">Failed to load users.</td></tr>';
+                return;
+            }
+
+            const users = await res.json();
+            countBadge.textContent = `${users.length} Users`;
+
+            let rows = '';
+            users.forEach(u => {
+                let roleBadge = 'bg-primary';
+                if (u.role === 'ADMIN') roleBadge = 'bg-danger';
+                else if (u.role === 'SUPERVISOR') roleBadge = 'bg-warning text-dark';
+
+                rows += `
+                    <tr>
+                        <td class="fw-semibold text-dark">${u.username}</td>
+                        <td class="text-muted">${u.email || '-'}</td>
+                        <td><span class="badge ${roleBadge}">${u.role}</span></td>
+                        <td class="text-muted" style="font-size: 0.75rem;">${new Date(u.date_joined).toLocaleDateString()}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-danger">Error: ' + err.message + '</td></tr>';
+        }
+    }
+
+    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const alertBox = document.getElementById('create-user-alert');
+        const submitBtn = document.getElementById('create-user-btn');
+
+        alertBox.classList.add('d-none');
+        submitBtn.disabled = true;
+
+        const payload = {
+            username: document.getElementById('new-username').value.trim(),
+            password: document.getElementById('new-password').value,
+            email: document.getElementById('new-email').value.trim(),
+            role: document.getElementById('new-role').value
+        };
+
+        try {
+            const res = await apiFetch('/users/', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alertBox.className = 'alert alert-success py-2 small';
+                alertBox.textContent = `User '${data.username}' created successfully as ${data.role}.`;
+                alertBox.classList.remove('d-none');
+                document.getElementById('create-user-form').reset();
+                loadUsers();
+            } else {
+                let msg = 'Failed to create user.';
+                if (typeof data === 'object') {
+                    msg = Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(' ');
+                }
+                alertBox.className = 'alert alert-danger py-2 small';
+                alertBox.textContent = msg;
+                alertBox.classList.remove('d-none');
+            }
+        } catch (err) {
+            alertBox.className = 'alert alert-danger py-2 small';
+            alertBox.textContent = 'Error: ' + err.message;
+            alertBox.classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    async function runIntegrityCheck() {
+        const tbody = document.getElementById('integrity-table-body');
+        const statusText = document.getElementById('integrity-status-text');
+        const subText = document.getElementById('integrity-sub-text');
+
+        tbody.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Calculating SHA-256 hashes...</td></tr>';
+
+        try {
+            const res = await apiFetch('/model/integrity/');
+            const data = await res.json();
+
+            document.getElementById('int-total').textContent = data.total_files || 0;
+            document.getElementById('int-matched').textContent = data.matched_count || 0;
+            document.getElementById('int-mismatch').textContent = data.mismatch_count || 0;
+
+            if (data.is_valid) {
+                statusText.innerHTML = '<span class="text-success"><i class="bi bi-shield-fill-check me-1"></i> ALL FILES VERIFIED CLEAN</span>';
+                subText.textContent = `All ${data.matched_count} files match SHA256SUMS.txt perfectly. (Model: ${data.model_version})`;
+            } else {
+                statusText.innerHTML = '<span class="text-danger"><i class="bi bi-shield-fill-x me-1"></i> INTEGRITY MISMATCH DETECTED</span>';
+                subText.textContent = `${data.mismatch_count} files mismatched or missing!`;
+            }
+
+            let rows = '';
+            (data.details || []).forEach(d => {
+                const isOk = d.status === 'OK';
+                const badge = isOk 
+                    ? '<span class="badge bg-success">OK</span>'
+                    : `<span class="badge bg-danger">${d.status}</span>`;
+                rows += `
+                    <tr>
+                        <td>${d.path}</td>
+                        <td class="text-end">${badge}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-danger">Error: ' + err.message + '</td></tr>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUsers();
+        runIntegrityCheck();
+    });
+</script>
+{% endblock %}
+

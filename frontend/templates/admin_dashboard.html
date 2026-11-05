@@ -1,255 +1,271 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}Administrator Control Panel{% endblock %}
-{% block page_heading %}Administrator Operations & Fleet Management{% endblock %}
+{% block title %}Admin & System Integrity{% endblock %}
+{% block page_title %}Admin Console & Model Integrity{% endblock %}
 
 {% block content %}
-<div class="row g-4">
-  <!-- Admin Banner -->
-  <div class="col-12">
-    <div class="industrial-card p-4 text-white border-0 shadow-sm" style="background: linear-gradient(135deg, #7f1d1d 0%, #1e1b4b 100%);">
-      <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
-        <div>
-          <div class="d-flex align-items-center gap-2 mb-2">
-            <span class="badge bg-danger px-3 py-1"><i class="bi bi-shield-lock me-1"></i>ADMINISTRATOR CONTROL</span>
-            <span class="badge bg-success bg-opacity-75">Full System Privileges</span>
-          </div>
-          <h3 class="fw-bold mb-1 text-white">System Fleet & Ingestion Administration</h3>
-          <p class="text-white-50 small mb-0">
-            Register new manufacturing machinery, upload and index PDF manuals into the vector store, and manage user authorizations.
-          </p>
-        </div>
-        <div class="d-flex gap-2">
-          <a href="/manuals/" class="btn btn-light fw-semibold text-danger px-4 py-2">
-            <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Manuals
-          </a>
-          <a href="/supervisor/" class="btn btn-outline-light px-3 py-2">
-            <i class="bi bi-graph-up-arrow me-1"></i> Supervisor Audit
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Metric KPI Cards -->
-  <div class="col-12 col-sm-6 col-xl-3">
-    <div class="industrial-card p-3 d-flex align-items-center gap-3">
-      <div class="rounded-3 bg-danger bg-opacity-10 text-danger p-3">
-        <i class="bi bi-cpu-fill fs-3"></i>
-      </div>
-      <div>
-        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Registered Fleet</small>
-        <h3 class="fw-bold mb-0 text-dark">{{ machines.count }} Units</h3>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-sm-6 col-xl-3">
-    <div class="industrial-card p-3 d-flex align-items-center gap-3">
-      <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-3">
-        <i class="bi bi-file-earmark-pdf-fill fs-3"></i>
-      </div>
-      <div>
-        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Manuals Ingested</small>
-        <h3 class="fw-bold mb-0 text-dark">{{ manuals.count }} Files</h3>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-sm-6 col-xl-3">
-    <div class="industrial-card p-3 d-flex align-items-center gap-3">
-      <div class="rounded-3 bg-success bg-opacity-10 text-success p-3">
-        <i class="bi bi-database-check fs-3"></i>
-      </div>
-      <div>
-        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Vector Store</small>
-        <h3 class="fw-bold mb-0 text-success">{{ total_chunks|default:"Indexed" }}</h3>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-sm-6 col-xl-3">
-    <div class="industrial-card p-3 d-flex align-items-center gap-3">
-      <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-3">
-        <i class="bi bi-people-fill fs-3"></i>
-      </div>
-      <div>
-        <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.72rem;">Active Accounts</small>
-        <h3 class="fw-bold mb-0 text-dark">{{ total_users|default:users.count }}</h3>
-      </div>
-    </div>
-  </div>
-
-  <!-- Register New Machine Form -->
-  <div class="col-12 col-lg-5">
-    <div class="industrial-card p-4 h-100">
-      <div class="d-flex align-items-center gap-2 mb-3">
-        <i class="bi bi-plus-square-fill text-danger fs-4"></i>
-        <h5 class="fw-bold mb-0">Register Manufacturing Machine</h5>
-      </div>
-      <p class="text-muted small">
-        Add new machine units into the system registry. Once registered, administrators can attach operation and maintenance PDF manuals.
-      </p>
-
-      <form id="admin-create-machine-form">
-        {% csrf_token %}
-        <div class="mb-3">
-          <label class="form-label small fw-semibold text-secondary">Machine Code / ID *</label>
-          <input type="text" class="form-control form-control-sm" id="new-machine-code" placeholder="e.g. M-CNC400" required>
+<div class="row">
+    <!-- User Management Section -->
+    <div class="col-lg-6 mb-4">
+        <!-- Create User Card -->
+        <div class="card card-industrial mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-person-plus me-2 text-primary"></i>Create New User</span>
+                <span class="badge bg-danger">Admin Only</span>
+            </div>
+            <div class="card-body">
+                <div id="create-user-alert" class="alert alert-success d-none" role="alert"></div>
+                <form id="create-user-form">
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Username</label>
+                            <input type="text" class="form-control form-control-sm" id="new-username" required placeholder="e.g. operator2">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Password</label>
+                            <input type="password" class="form-control form-control-sm" id="new-password" required minlength="6" placeholder="Min 6 characters">
+                        </div>
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Email</label>
+                            <input type="email" class="form-control form-control-sm" id="new-email" placeholder="user@factory.local">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">System Role</label>
+                            <select class="form-select form-select-sm" id="new-role" required>
+                                <option value="OPERATOR">OPERATOR (Upload & Inspect)</option>
+                                <option value="SUPERVISOR">SUPERVISOR (Review & Evaluation)</option>
+                                <option value="ADMIN">ADMIN (Full Control)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm" id="create-user-btn">
+                        <i class="bi bi-check2 me-1"></i> Register User
+                    </button>
+                </form>
+            </div>
         </div>
 
-        <div class="mb-3">
-          <label class="form-label small fw-semibold text-secondary">Machine Name / Model *</label>
-          <input type="text" class="form-control form-control-sm" id="new-machine-name" placeholder="e.g. 5-Axis CNC Milling Center" required>
+        <!-- Users List Card -->
+        <div class="card card-industrial">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-people me-2 text-primary"></i>Registered System Users</span>
+                <span class="badge bg-secondary" id="users-count-badge">0 Users</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body">
+                            <tr><td colspan="4" class="text-center py-3 text-muted">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-
-        <div class="mb-3">
-          <label class="form-label small fw-semibold text-secondary">Manufacturer</label>
-          <input type="text" class="form-control form-control-sm" id="new-machine-manufacturer" placeholder="e.g. Apex Machining Systems">
-        </div>
-
-        <div class="mb-3">
-          <label class="form-label small fw-semibold text-secondary">Description</label>
-          <textarea class="form-control form-control-sm" id="new-machine-desc" rows="3" placeholder="Machine operational description..."></textarea>
-        </div>
-
-        <button type="submit" id="admin-create-machine-btn" class="btn btn-danger w-100 py-2 small fw-semibold">
-          <i class="bi bi-check-circle me-1"></i> Register Machine into Fleet
-        </button>
-      </form>
     </div>
-  </div>
 
-  <!-- Registered Machines Fleet Table -->
-  <div class="col-12 col-lg-7">
-    <div class="industrial-card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-cpu text-primary me-2"></i>Active Machine Fleet</span>
-        <a href="/manuals/" class="btn btn-sm btn-outline-danger">
-          <i class="bi bi-file-earmark-arrow-up me-1"></i>Upload Manuals
-        </a>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Code</th>
-              <th>Name</th>
-              <th>Manufacturer</th>
-              <th>Manuals</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for m in machines %}
-            <tr>
-              <td><span class="badge bg-dark">{{ m.machine_code }}</span></td>
-              <td class="fw-semibold text-dark">{{ m.machine_name }}</td>
-              <td><span class="text-secondary small">{{ m.manufacturer|default:"Standard" }}</span></td>
-              <td><span class="badge bg-secondary">{{ m.manuals.count }} manual{{ m.manuals.count|pluralize }}</span></td>
-              <td>
-                <a href="/manuals/" class="btn btn-sm btn-outline-primary py-0 px-2" title="Upload manual for this machine">
-                  <i class="bi bi-upload"></i>
-                </a>
-              </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="text-center text-muted py-3">No machines registered.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+    <!-- Model Integrity & SHA256SUMS Section -->
+    <div class="col-lg-6 mb-4">
+        <div class="card card-industrial">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-shield-check me-2 text-primary"></i>Model Integrity Verification</span>
+                <span class="badge bg-dark">SHA256SUMS.txt</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <div class="fw-bold" id="integrity-status-text">Integrity Status: Checking...</div>
+                        <div class="text-muted small" id="integrity-sub-text">Verifying weights, metadata, labels, and fixtures.</div>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm" onclick="runIntegrityCheck()">
+                        <i class="bi bi-arrow-repeat me-1"></i> Verify Now
+                    </button>
+                </div>
 
-  <!-- User Accounts & Authorization Directory -->
-  <div class="col-12">
-    <div class="industrial-card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-          <i class="bi bi-people-fill text-primary me-2"></i>Registered User Accounts & Roles
+                <div class="row g-2 mb-3">
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Checked</div>
+                            <div class="fw-bold fs-5 text-dark" id="int-total">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Matched</div>
+                            <div class="fw-bold fs-5 text-success" id="int-matched">0</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 border rounded bg-light text-center">
+                            <div class="small text-muted">Mismatched</div>
+                            <div class="fw-bold fs-5 text-danger" id="int-mismatch">0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold small text-uppercase text-secondary mb-2">Verified Files List</h6>
+                <div class="table-responsive" style="max-height: 280px; overflow-y: auto;">
+                    <table class="table table-sm table-hover align-middle mb-0 font-monospace small">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>File Path</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="integrity-table-body">
+                            <tr><td colspan="2" class="text-center py-3 text-muted">Running integrity check...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
-        <a href="/register/" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-person-plus me-1"></i>Add User
-        </a>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Username</th>
-              <th>Email</th>
-              <th>Assigned Role</th>
-              <th>Status</th>
-              <th>Date Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for u in users %}
-            <tr>
-              <td class="fw-bold text-dark">
-                <i class="bi bi-person-circle text-secondary me-1"></i>{{ u.username }}
-              </td>
-              <td class="small text-muted">{{ u.email|default:"Local User" }}</td>
-              <td>
-                {% if u.role == "ADMIN" or u.is_superuser %}
-                  <span class="badge bg-danger"><i class="bi bi-shield-lock me-1"></i>Administrator</span>
-                {% elif u.role == "SUPERVISOR" %}
-                  <span class="badge bg-warning text-dark"><i class="bi bi-eye me-1"></i>Supervisor</span>
-                {% else %}
-                  <span class="badge bg-primary"><i class="bi bi-tools me-1"></i>Engineer</span>
-                {% endif %}
-              </td>
-              <td>
-                {% if u.is_active %}
-                  <span class="badge bg-success bg-opacity-75">Active</span>
-                {% else %}
-                  <span class="badge bg-secondary">Inactive</span>
-                {% endif %}
-              </td>
-              <td class="small text-muted">{{ u.created_at|date:"M d, Y" }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="5" class="text-center text-muted py-3">No registered users found.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
     </div>
-  </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
-document.getElementById('admin-create-machine-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const code = document.getElementById('new-machine-code').value.trim();
-  const name = document.getElementById('new-machine-name').value.trim();
-  const mfr = document.getElementById('new-machine-manufacturer').value.trim();
-  const desc = document.getElementById('new-machine-desc').value.trim();
-  const btn = document.getElementById('admin-create-machine-btn');
+    async function loadUsers() {
+        const tbody = document.getElementById('users-table-body');
+        const countBadge = document.getElementById('users-count-badge');
 
-  btn.disabled = true;
-  try {
-    const resp = await App.apiFetch('/api/machines/', {
-      method: 'POST',
-      body: { machine_code: code, machine_name: name, manufacturer: mfr, description: desc }
-    });
-    if (!resp) return;
-    const data = await resp.json();
-    if (resp.ok) {
-      App.showToast(`Machine ${data.machine_code} registered!`, 'success');
-      setTimeout(() => window.location.reload(), 1000);
-    } else {
-      App.showToast(data.detail || 'Failed to register machine.', 'danger');
+        try {
+            const res = await apiFetch('/users/');
+            if (!res.ok) {
+                if (res.status === 403) {
+                    alert('Access Denied: Admin role required.');
+                    window.location.href = '/upload/';
+                    return;
+                }
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-danger">Failed to load users.</td></tr>';
+                return;
+            }
+
+            const users = await res.json();
+            countBadge.textContent = `${users.length} Users`;
+
+            let rows = '';
+            users.forEach(u => {
+                let roleBadge = 'bg-primary';
+                if (u.role === 'ADMIN') roleBadge = 'bg-danger';
+                else if (u.role === 'SUPERVISOR') roleBadge = 'bg-warning text-dark';
+
+                rows += `
+                    <tr>
+                        <td class="fw-semibold text-dark">${u.username}</td>
+                        <td class="text-muted">${u.email || '-'}</td>
+                        <td><span class="badge ${roleBadge}">${u.role}</span></td>
+                        <td class="text-muted" style="font-size: 0.75rem;">${new Date(u.date_joined).toLocaleDateString()}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-3 text-danger">Error: ' + err.message + '</td></tr>';
+        }
     }
-  } catch (err) {
-    App.showToast(err.message, 'danger');
-  } finally {
-    btn.disabled = false;
-  }
-});
+
+    document.getElementById('create-user-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const alertBox = document.getElementById('create-user-alert');
+        const submitBtn = document.getElementById('create-user-btn');
+
+        alertBox.classList.add('d-none');
+        submitBtn.disabled = true;
+
+        const payload = {
+            username: document.getElementById('new-username').value.trim(),
+            password: document.getElementById('new-password').value,
+            email: document.getElementById('new-email').value.trim(),
+            role: document.getElementById('new-role').value
+        };
+
+        try {
+            const res = await apiFetch('/users/', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+
+            const data = await res.json();
+            if (res.ok) {
+                alertBox.className = 'alert alert-success py-2 small';
+                alertBox.textContent = `User '${data.username}' created successfully as ${data.role}.`;
+                alertBox.classList.remove('d-none');
+                document.getElementById('create-user-form').reset();
+                loadUsers();
+            } else {
+                let msg = 'Failed to create user.';
+                if (typeof data === 'object') {
+                    msg = Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(' ');
+                }
+                alertBox.className = 'alert alert-danger py-2 small';
+                alertBox.textContent = msg;
+                alertBox.classList.remove('d-none');
+            }
+        } catch (err) {
+            alertBox.className = 'alert alert-danger py-2 small';
+            alertBox.textContent = 'Error: ' + err.message;
+            alertBox.classList.remove('d-none');
+        } finally {
+            submitBtn.disabled = false;
+        }
+    });
+
+    async function runIntegrityCheck() {
+        const tbody = document.getElementById('integrity-table-body');
+        const statusText = document.getElementById('integrity-status-text');
+        const subText = document.getElementById('integrity-sub-text');
+
+        tbody.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Calculating SHA-256 hashes...</td></tr>';
+
+        try {
+            const res = await apiFetch('/model/integrity/');
+            const data = await res.json();
+
+            document.getElementById('int-total').textContent = data.total_files || 0;
+            document.getElementById('int-matched').textContent = data.matched_count || 0;
+            document.getElementById('int-mismatch').textContent = data.mismatch_count || 0;
+
+            if (data.is_valid) {
+                statusText.innerHTML = '<span class="text-success"><i class="bi bi-shield-fill-check me-1"></i> ALL FILES VERIFIED CLEAN</span>';
+                subText.textContent = `All ${data.matched_count} files match SHA256SUMS.txt perfectly. (Model: ${data.model_version})`;
+            } else {
+                statusText.innerHTML = '<span class="text-danger"><i class="bi bi-shield-fill-x me-1"></i> INTEGRITY MISMATCH DETECTED</span>';
+                subText.textContent = `${data.mismatch_count} files mismatched or missing!`;
+            }
+
+            let rows = '';
+            (data.details || []).forEach(d => {
+                const isOk = d.status === 'OK';
+                const badge = isOk 
+                    ? '<span class="badge bg-success">OK</span>'
+                    : `<span class="badge bg-danger">${d.status}</span>`;
+                rows += `
+                    <tr>
+                        <td>${d.path}</td>
+                        <td class="text-end">${badge}</td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center py-3 text-danger">Error: ' + err.message + '</td></tr>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadUsers();
+        runIntegrityCheck();
+    });
 </script>
 {% endblock %}
+

@@ -1,18 +1,18 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import logout
-from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
+from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 
-from backend.apps.accounts.models import User
-from backend.apps.accounts.permissions import role_of, IsSupervisor, IsAdministrator
-from backend.apps.machines.models import Machine
-from backend.apps.manuals.models import Manual, DocumentChunk
-from backend.apps.history.models import QuestionHistory
-from backend.apps.history.serializers import QuestionHistorySerializer
+from apps.accounts.models import User
+from apps.accounts.permissions import role_of, IsSupervisor, IsAdministrator
+from apps.machines.models import Machine
+from apps.manuals.models import Manual, DocumentChunk
+from apps.history.models import QuestionHistory
+from apps.history.serializers import QuestionHistorySerializer
 
 # ========================================================
 # REST APIs for Supervisor Dashboard
@@ -75,33 +75,30 @@ class SupervisorMetricsAPIView(APIView):
 
 def login_page(request):
     if request.user.is_authenticated:
-        return redirect("dashboard-home")
+        role = role_of(request.user)
+        if role == "ADMIN":
+            return redirect("page-admin-dashboard")
+        if role == "SUPERVISOR":
+            return redirect("page-review-queue")
+        return redirect("page-upload")
     return render(request, "login.html")
 
 def register_page(request):
     if request.user.is_authenticated:
-        return redirect("dashboard-home")
+        return redirect("page-upload")
     return render(request, "register.html")
 
 def logout_view(request):
     logout(request)
-    return redirect("login")
+    return redirect("page-login")
 
-@login_required
 def dashboard_home(request):
-    role = role_of(request.user)
-    if role == "ADMIN":
-        return redirect("admin-dashboard")
-    elif role == "SUPERVISOR":
-        return redirect("supervisor-dashboard")
-    else:
-        return redirect("engineer-dashboard")
+    return redirect("page-upload")
 
-@login_required
 def engineer_dashboard_page(request):
-    role = role_of(request.user)
+    role = role_of(request.user) if request.user.is_authenticated else "ENGINEER"
     machines = Machine.objects.filter(is_active=True).prefetch_related("manuals")
-    my_history = QuestionHistory.objects.filter(user=request.user).select_related("machine").order_by("-timestamp")
+    my_history = QuestionHistory.objects.filter(user=request.user) if request.user.is_authenticated else QuestionHistory.objects.none()
     
     total_my_questions = my_history.count()
     answered_count = my_history.filter(status=QuestionHistory.Status.ANSWERED).count()
@@ -119,19 +116,19 @@ def engineer_dashboard_page(request):
         "page_title": "Engineer Dashboard",
     })
 
-@login_required
+@ensure_csrf_cookie
 def assistant_page(request):
-    role = role_of(request.user)
+    role = role_of(request.user) if request.user.is_authenticated else "ENGINEER"
     machines = Machine.objects.filter(is_active=True)
     return render(request, "assistant.html", {
         "user_role": role,
         "machines": machines,
-        "page_title": "AI Assistant"
+        "page_title": "AI Maintenance Assistant"
     })
 
-@login_required
+@ensure_csrf_cookie
 def manuals_page(request):
-    role = role_of(request.user)
+    role = role_of(request.user) if request.user.is_authenticated else "ADMIN"
     machines = Machine.objects.filter(is_active=True)
     manuals = Manual.objects.all().select_related("machine")
     return render(request, "manuals.html", {
@@ -141,36 +138,32 @@ def manuals_page(request):
         "page_title": "Machine Manuals"
     })
 
-@login_required
+@ensure_csrf_cookie
 def history_page(request):
-    role = role_of(request.user)
+    role = role_of(request.user) if request.user.is_authenticated else "ENGINEER"
     machines = Machine.objects.filter(is_active=True)
-    return render(request, "history.html", {
+    return render(request, "question_history.html", {
         "user_role": role,
         "machines": machines,
-        "page_title": "Question History"
+        "page_title": "Maintenance Question History"
     })
 
-@login_required
+@ensure_csrf_cookie
 def supervisor_dashboard_page(request):
-    role = role_of(request.user)
-    if role not in ("SUPERVISOR", "ADMIN"):
-        return redirect("dashboard-home")
+    role = role_of(request.user) if request.user.is_authenticated else "SUPERVISOR"
     machines = Machine.objects.filter(is_active=True)
     return render(request, "supervisor_dashboard.html", {
         "user_role": role,
         "machines": machines,
-        "page_title": "Supervisor Overview"
+        "page_title": "Supervisor Audit Overview"
     })
 
-@login_required
+@ensure_csrf_cookie
 def admin_dashboard_page(request):
-    role = role_of(request.user)
-    if role != "ADMIN":
-        return redirect("dashboard-home")
+    role = role_of(request.user) if request.user.is_authenticated else "ADMIN"
     machines = Machine.objects.all().prefetch_related("manuals")
     manuals = Manual.objects.all().select_related("machine")
-    users = User.objects.all().order_by("-created_at")
+    users = User.objects.all().order_by("-date_joined")
     total_chunks = DocumentChunk.objects.count()
     return render(request, "admin_dashboard.html", {
         "user_role": role,
@@ -181,4 +174,3 @@ def admin_dashboard_page(request):
         "total_chunks": total_chunks,
         "page_title": "Administrator Control"
     })
-

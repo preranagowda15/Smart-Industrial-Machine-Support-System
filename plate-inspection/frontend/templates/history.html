@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Inspection History{% endblock %}
+{% block page_title %}Inspection History Audit{% endblock %}
+
+{% block content %}
+<div class="card card-industrial">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-clock-history me-2 text-primary"></i>
+            <span class="fw-bold">Historical Plate Records</span>
+            <span class="badge bg-secondary ms-2" id="history-total-count">0 Records</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <select class="form-select form-select-sm" id="filter-prediction" style="width: 140px;">
+                <option value="">All Results</option>
+                <option value="0">Normal</option>
+                <option value="1">Defective</option>
+            </select>
+            <select class="form-select form-select-sm" id="filter-review" style="width: 150px;">
+                <option value="">All Reviews</option>
+                <option value="unreviewed">Unreviewed Only</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadHistory()">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="history-table">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th style="width: 70px;">Thumbnail</th>
+                        <th>Operator</th>
+                        <th>Classification</th>
+                        <th>Confidence</th>
+                        <th>Defect Prob</th>
+                        <th>Supervisor Review</th>
+                        <th>Timestamp</th>
+                        <th style="width: 110px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body">
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <span class="spinner-border spinner-border-sm me-2"></span> Loading inspections...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadHistory() {
+        const tbody = document.getElementById('history-table-body');
+        const countBadge = document.getElementById('history-total-count');
+        const predFilter = document.getElementById('filter-prediction').value;
+        const reviewFilter = document.getElementById('filter-review').value;
+
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading inspections...</td></tr>';
+
+        let url = '/inspections/?';
+        if (predFilter !== '') url += `predicted_class=${predFilter}&`;
+        if (reviewFilter === 'unreviewed') url += `unreviewed=true&`;
+
+        try {
+            const res = await apiFetch(url);
+            if (!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Failed to load inspections.</td></tr>';
+                return;
+            }
+
+            const data = await res.json();
+            countBadge.textContent = `${data.length} Records`;
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No inspection records found.</td></tr>';
+                return;
+            }
+
+            let rows = '';
+            data.forEach(item => {
+                const isDefective = item.predicted_class === 1;
+                const classBadge = isDefective 
+                    ? '<span class="badge-defective"><i class="bi bi-exclamation-triangle-fill me-1"></i>Defective</span>'
+                    : '<span class="badge-normal"><i class="bi bi-check-circle-fill me-1"></i>Normal</span>';
+
+                let reviewBadge = '<span class="badge bg-light text-secondary border">Unreviewed</span>';
+                if (item.latest_review) {
+                    const isConfirmed = item.latest_review.decision === 'CONFIRMED';
+                    reviewBadge = isConfirmed
+                        ? `<span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-lg me-1"></i>Confirmed (${item.latest_review.reviewer})</span>`
+                        : `<span class="badge bg-warning-subtle text-warning border border-warning"><i class="bi bi-arrow-left-right me-1"></i>Overridden (${item.latest_review.reviewer})</span>`;
+                }
+
+                const confPct = Math.round((item.confidence || 0) * 100);
+                const defectPct = Math.round((item.defect_probability || 0) * 100);
+                const timeStr = new Date(item.created_at).toLocaleString();
+
+                rows += `
+                    <tr>
+                        <td class="fw-bold">#${item.id}</td>
+                        <td>
+                            <img src="${item.image}" alt="thumb" class="rounded border" style="width: 48px; height: 48px; object-fit: cover;">
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark">${item.username}</div>
+                            <div class="text-muted small" style="font-size: 0.75rem;">${item.user_role}</div>
+                        </td>
+                        <td>${classBadge}</td>
+                        <td class="fw-semibold">${confPct}%</td>
+                        <td class="fw-semibold text-danger">${defectPct}%</td>
+                        <td>${reviewBadge}</td>
+                        <td class="text-muted small">${timeStr}</td>
+                        <td class="text-end">
+                            <a href="/inspections/${item.id}/" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Network error: ' + err.message + '</td></tr>';
+        }
+    }
+
+    document.getElementById('filter-prediction').addEventListener('change', loadHistory);
+    document.getElementById('filter-review').addEventListener('change', loadHistory);
+    document.addEventListener('DOMContentLoaded', loadHistory);
+</script>
+{% endblock %}
+

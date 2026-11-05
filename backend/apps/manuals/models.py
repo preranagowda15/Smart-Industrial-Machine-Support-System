@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from backend.apps.machines.models import Machine
+from apps.machines.models import Machine
 
 class Manual(models.Model):
     class IngestionStatus(models.TextChoices):
@@ -30,6 +30,7 @@ class Manual(models.Model):
     error_message = models.TextField(blank=True, default="")
 
     class Meta:
+        app_label = "manuals"
         ordering = ["machine__machine_code", "document_name"]
 
     def __str__(self):
@@ -45,6 +46,7 @@ class DocumentChunk(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        app_label = "manuals"
         ordering = ["manual", "page_number", "chunk_index"]
 
     def __str__(self):

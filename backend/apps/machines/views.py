@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import Machine
 from .serializers import MachineSerializer
-from backend.apps.accounts.permissions import IsAdministrator
+from apps.accounts.permissions import IsAdministrator
 
 class MachineListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated]

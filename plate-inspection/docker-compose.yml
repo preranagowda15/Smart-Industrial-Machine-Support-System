@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: plate_inspection_db
+    restart: always
+    environment:
+      POSTGRES_DB: plate_inspection_db
+      POSTGRES_USER: plate_user
+      POSTGRES_PASSWORD: plate_secure_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plate_user -d plate_inspection_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    container_name: plate_inspection_web
+    restart: always
+    command: python backend/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_ENGINE=postgresql
+      - DB_NAME=plate_inspection_db
+      - DB_USER=plate_user
+      - DB_PASSWORD=plate_secure_password
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-bit-plate-cv-docker-compose-secret
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+

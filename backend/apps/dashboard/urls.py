@@ -17,9 +17,12 @@ from .views import (
 
 urlpatterns = [
     # REST API for supervisor
-    path("api/supervisor/questions/", SupervisorQuestionsAPIView.as_view(), name="api-supervisor-questions"),
-    path("api/supervisor/unanswered/", SupervisorUnansweredAPIView.as_view(), name="api-supervisor-unanswered"),
-    path("api/supervisor/metrics/", SupervisorMetricsAPIView.as_view(), name="api-supervisor-metrics"),
+    path("questions/", SupervisorQuestionsAPIView.as_view(), name="api-supervisor-questions"),
+    path("unanswered/", SupervisorUnansweredAPIView.as_view(), name="api-supervisor-unanswered"),
+    path("metrics/", SupervisorMetricsAPIView.as_view(), name="api-supervisor-metrics"),
+    path("api/supervisor/questions/", SupervisorQuestionsAPIView.as_view()),
+    path("api/supervisor/unanswered/", SupervisorUnansweredAPIView.as_view()),
+    path("api/supervisor/metrics/", SupervisorMetricsAPIView.as_view()),
 
     # Page Routes
     path("", dashboard_home, name="dashboard-home"),
@@ -33,4 +36,3 @@ urlpatterns = [
     path("supervisor/", supervisor_dashboard_page, name="supervisor-dashboard"),
     path("admin-panel/", admin_dashboard_page, name="admin-dashboard"),
 ]
-

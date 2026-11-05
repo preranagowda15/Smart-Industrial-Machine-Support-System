@@ -90,12 +90,22 @@ document.addEventListener("DOMContentLoaded", () => {
     el.innerHTML = `
       <div class="d-flex align-items-center gap-2 text-muted">
         <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
-        <span>Searching machine manual vector index and grounding answer...</span>
+        <span>Searching machine manual vector index and generating answer...</span>
       </div>
     `;
     chatMessages.appendChild(el);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     return el;
+  }
+
+  function formatAnswerParagraphs(text) {
+    if (!text) return "";
+    // Replace double newlines with paragraphs, single newlines with <br>
+    const paras = text.split(/\n\s*\n/);
+    return paras.map(p => {
+      const formatted = p.trim().replace(/\n/g, "<br>");
+      return `<p class="mb-2">${formatted}</p>`;
+    }).join("");
   }
 
   function renderAssistantResponse(data) {
@@ -105,43 +115,54 @@ document.addEventListener("DOMContentLoaded", () => {
     const isAnswered = data.status === "ANSWERED";
     const statusClass = isAnswered ? "message-answered" : "message-insufficient";
     const badgeHtml = isAnswered
-      ? `<span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>ANSWERED</span>`
+      ? `<span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>GROUNDED ANSWER FOUND</span>`
       : `<span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-exclamation-triangle-fill me-1"></i>INSUFFICIENT EVIDENCE</span>`;
 
+    // Citations & Line Numbers HTML
     let citationsHtml = "";
     if (data.source_references && data.source_references.length > 0) {
       citationsHtml = `
         <div class="mt-3 pt-2 border-top">
           <div class="d-flex align-items-center justify-content-between mb-2">
-            <small class="text-secondary fw-bold text-uppercase">
+            <small class="text-secondary fw-bold text-uppercase" style="font-size: 0.75rem;">
               <i class="bi bi-journal-bookmark-fill text-primary me-1"></i>Verified Manual Sources & Citations:
             </small>
           </div>
           <div class="d-flex flex-column gap-2">
             ${data.source_references.map(src => {
               const hasLinePrefix = src.passage_text && src.passage_text.startsWith("[Lines ");
-              const lineBadge = hasLinePrefix 
-                ? `<span class="badge bg-primary ms-1">${src.passage_text.slice(1, src.passage_text.indexOf(']'))}</span>` 
+              const lineRange = hasLinePrefix 
+                ? src.passage_text.slice(1, src.passage_text.indexOf(']')) 
                 : '';
               const cleanPassage = hasLinePrefix 
                 ? src.passage_text.slice(src.passage_text.indexOf(']\n') + 2) 
-                : src.passage_text;
+                : (src.passage_text || '');
+
+              const lineBadge = lineRange 
+                ? `<span class="badge bg-primary text-white"><i class="bi bi-list-ol me-1"></i>${lineRange}</span>` 
+                : '';
 
               return `
                 <div class="citation-card p-2 bg-light rounded border">
-                  <div class="d-flex justify-content-between align-items-center mb-1">
-                    <div>
-                      <strong class="text-dark">${src.document_name}</strong> (Rev ${src.revision}) &bull; 
-                      <span class="badge bg-secondary">PDF Page ${src.pdf_page}</span>
+                  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+                    <div class="d-flex align-items-center gap-2">
+                      <strong class="text-dark"><i class="bi bi-file-earmark-pdf text-danger me-1"></i>${src.document_name}</strong> 
+                      <span class="badge bg-secondary">Rev ${src.revision}</span>
+                      <span class="badge bg-dark">PDF Page ${src.pdf_page}</span>
                       ${lineBadge}
                     </div>
-                    <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" title="Open PDF Page in new tab">
+                    <a href="${src.pdf_url}" target="_blank" class="btn btn-sm btn-outline-primary py-0 px-2" title="Open PDF Page">
                       <i class="bi bi-box-arrow-up-right me-1"></i>Open PDF Page
                     </a>
                   </div>
-                  <div class="passage-text text-muted small fst-italic ps-2 border-start border-2 border-secondary border-opacity-50">
-                    "${cleanPassage}"
-                  </div>
+                  <details class="mt-2 text-muted small">
+                    <summary class="cursor-pointer text-primary" style="font-size: 0.8rem; cursor: pointer;">
+                      <i class="bi bi-chevron-right me-1"></i>Click to view verbatim manual passage (${lineRange || 'Page ' + src.pdf_page})
+                    </summary>
+                    <div class="passage-text p-2 mt-1 bg-white rounded border border-secondary border-opacity-25 fst-italic">
+                      "${cleanPassage}"
+                    </div>
+                  </details>
                 </div>
               `;
             }).join("")}
@@ -150,31 +171,53 @@ document.addEventListener("DOMContentLoaded", () => {
       `;
     }
 
+    const formattedAnswer = formatAnswerParagraphs(data.answer);
+
     const el = document.createElement("div");
     el.className = `message-bubble message-assistant ${statusClass} shadow-sm`;
     el.innerHTML = `
-      <div class="d-flex align-items-center mb-2">
-        ${badgeHtml}
-        <small class="text-muted ms-auto">${new Date().toLocaleTimeString()}</small>
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+          ${badgeHtml}
+          <span class="badge bg-light text-dark border">
+            <i class="bi bi-cpu me-1 text-primary"></i>${data.machine_code || machineSelect.value}
+          </span>
+        </div>
+        <small class="text-muted">${new Date().toLocaleTimeString()}</small>
       </div>
       
       <!-- Primary Highlighted Answer Card -->
       <div class="p-3 my-2 rounded-3 bg-white border border-primary border-opacity-50 shadow-sm" style="background-color: #f8fafc !important;">
-        <div class="d-flex align-items-center gap-2 mb-2 text-primary fw-bold small">
-          <i class="bi bi-robot fs-5"></i>
-          <span class="text-uppercase tracking-wider">AI Assistant Answer:</span>
+        <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+          <div class="d-flex align-items-center gap-2 text-primary fw-bold" style="font-size: 0.85rem;">
+            <i class="bi bi-robot fs-5"></i>
+            <span class="text-uppercase tracking-wider">AI Assistant Answer (from Official Manuals):</span>
+          </div>
+          ${data.source_references && data.source_references.length > 0 ? `
+            <span class="badge bg-info text-dark" style="font-size: 0.72rem;">
+              <i class="bi bi-check2-all me-1"></i>Grounded & Verified
+            </span>
+          ` : ''}
         </div>
-        <div class="fs-6 text-dark fw-semibold lh-base" style="font-size: 1.05rem !important; color: #0f172a !important;">
-          ${data.answer}
+        
+        <!-- Answer Body in Paragraph Form -->
+        <div class="text-dark lh-base" style="font-size: 1rem; color: #0f172a !important;">
+          ${formattedAnswer}
         </div>
       </div>
 
+      <!-- Verified Citations & Line Numbers -->
       ${citationsHtml}
     `;
 
     chatMessages.appendChild(el);
+
+    // Scroll to position the answer at the top of the chat area
     setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
+      chatMessages.scrollTo({
+        top: el.offsetTop - 15,
+        behavior: "smooth"
+      });
     }, 50);
   }
 
@@ -227,4 +270,3 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
-

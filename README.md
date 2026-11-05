@@ -1,172 +1,233 @@
-# Manufacturing Manual Assistant
+# Plate Inspection System (BIT-PLATE-CV-1.0)
 
-[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
-[![Django 5.2](https://img.shields.io/badge/Django-5.2-green.svg)](https://www.djangoproject.com/)
-[![REST Framework](https://img.shields.io/badge/DRF-3.18-red.svg)](https://www.django-rest-framework.org/)
-[![PyMuPDF](https://img.shields.io/badge/PyMuPDF-1.28-orange.svg)](https://pymupdf.readthedocs.io/)
-[![Tests: 16/16 Passed](https://img.shields.io/badge/Tests-16%2F16%20Passed-brightgreen.svg)]()
-
-A full-stack, production-grade **Retrieval-Augmented Generation (RAG)** application built with Python, Django, Django REST Framework, PyMuPDF, and vector search. It enables manufacturing engineers to ask technical questions about specific machinery and receive verifiable answers grounded strictly and exclusively in official PDF operation and maintenance manuals.
+Quality Inspection Web Application for Metal Plate Product **P-PLATE01**.
 
 ---
 
-## 1. Core Objectives & Safety Invariants
+## 1. Project Overview & Scope
+This application provides automated quality inspection for synthetic images of metal plates (**P-PLATE01**). When an operator uploads a photo, the system validates the image, invokes the pretrained logistic regression model (**BIT-PLATE-CV-1.0**), displays the classification (**Normal** or **Defective**) with confidence and defect probability, permanently persists the immutable inspection record, allows supervisors to append audit reviews, and provides honest evaluation benchmarking across the 60 labeled development samples.
 
-1. **Role-Based Authorization**: Distinct roles for **Administrator**, **Engineer**, and **Supervisor** enforced on backend REST endpoints.
-2. **Machine-Level Retrieval Isolation**: Strict filtering (`where={"machine_id": selected_machine_id}`) applied directly inside the vector database query engine. No cross-machine data leakage.
-3. **Multi-Document Retrieval**: Seamlessly retrieves complementary evidence across multiple manuals (e.g. HP-200 Operations and Maintenance manuals).
-4. **Verifiable Citations**: Returns document name, revision, exact 1-based physical PDF page number, extracted passage snippet, and a direct browser link (`/media/manuals/<pdf>#page=<page>`).
-5. **Zero Hallucination Guarantee**: When evidence is missing or below relevance thresholds, the system returns:  
-   `"The available manuals do not contain enough information to answer this question."` and persists status as `INSUFFICIENT_EVIDENCE`.
-6. **Administrator-Only Ingestion**: Non-administrators (Engineers/Supervisors) attempting manual uploads receive `HTTP 403 Forbidden`.
+### Operational Scope & Limitations:
+- **Product Scope:** Demonstration system designed for fictional product **P-PLATE01** on 256×256 synthetic development images with centered plate framing and dark border.
+- **Binary Assessment Only:** Evaluates only binary classification (**Normal** / **Defective**). Does not determine defect type, spatial location, depth, root cause, or time-to-failure.
+- **Uncalibrated Confidence:** The confidence score represents the raw sigmoid model probability and must not be interpreted as an empirical probability of hardware safety or real-world reliability.
+- **Human Oversight Required:** Human supervisor review is strictly separated and recorded in an append-only audit log.
 
 ---
 
-## 2. Architecture & Modular Structure
+## 2. Architecture & Tech Stack
 
 ```
-manufacturing-manual-assistant/
-backend/
-    config/              # Django settings, URLs, WSGI, ASGI
-    apps/
-        accounts/        # User model, roles, JWT & session auth, permissions
-        machines/        # Machine registry models and APIs
-        manuals/         # Manuals, DocumentChunks, ingestion pipeline
-        assistant/       # RAG question submission endpoint (/api/assistant/ask/)
-        history/         # QuestionHistory, SourceReference models and APIs
-        dashboard/       # Supervisor APIs and frontend template views
-    services/
-        pdf_processor.py      # PyMuPDF 1-based page extraction
-        chunking_service.py   # Overlapping passage chunking & metadata preservation
-        embedding_service.py  # Dense subword vector generation & API fallback
-        vector_store.py       # Persistent vector database with SQL metadata filter
-        retrieval_service.py  # Machine-isolated retrieval engine
-        rag_service.py        # Strict prompt orchestration & evidence thresholding
-        citation_service.py   # Hallucination rejection & PDF link generation
-frontend/
-    templates/           # Bootstrap 5 HTML templates (base, login, assistant, etc.)
-    static/
-        css/style.css    # Professional dark navy & clean industrial SaaS theme
-        js/              # Modular JavaScript (app.js, assistant.js, manuals.js, etc.)
-data/
-    Manuals/             # Official machine manuals (HP-200, AC-90)
-    machine_manual_index.csv
-vector_db/               # Persistent vector collection storage
-media/manuals/           # Served PDF documents for clickable page navigation
-scripts/
-    seed_data.py         # Automated database seeding & indexing
-    ingest_manuals.py    # CLI manual importer
-    create_admin.py      # Quick admin creation utility
-tests/
-    test_role_permissions.py   # Mandatory Test 1: Engineer upload denial
-    test_machine_isolation.py  # Mandatory Test 2: Machine retrieval isolation
-    test_rag_grounding.py      # Strict evidence grounding & citation verification
-    test_end_to_end.py         # Full 5 end-to-end competition scenarios
-project_graph.json       # Graph Engineering dependency graph
-requirements.txt
-docker-compose.yml
-Makefile
+plate-inspection/
+├── backend/
+│   ├── apps/
+│   │   ├── accounts/         # Custom User model, JWT authentication, roles & permissions
+│   │   ├── inspections/      # Inspection model, upload validation, prediction persistence
+│   │   ├── reviews/          # Append-only Review table, supervisor audit trail
+│   │   └── evaluation/       # Benchmark evaluation runner & model integrity endpoint
+│   ├── config/               # Django settings, URLs, WSGI, ASGI
+│   ├── services/
+│   │   ├── image_validator.py    # 5-rule upload validation pipeline
+│   │   ├── model_service.py      # Thin wrapper around Model/inference.py
+│   │   ├── integrity_service.py  # SHA-256 file checksum verification
+│   │   └── metrics_service.py    # Confusion matrix & recall computation
+│   ├── tests/                # 8 comprehensive pytest suites
+│   └── manage.py
+├── frontend/
+│   ├── static/               # Industrial CSS, JS API client, icons
+│   └── templates/            # HTML5 + Bootstrap 5 dashboards
+├── Model/
+│   ├── classifier.npz        # Pretrained 17-feature logistic regression weights
+│   ├── inference.py          # Authoritative preprocessing & predict(path) contract
+│   └── requirements.txt      # numpy, Pillow
+├── Samples/
+│   ├── images/               # 60 labeled synthetic images (30 Normal, 30 Defective)
+│   └── labels.csv            # relative_path, label (0=Normal, 1=Defective)
+├── Validation/
+│   ├── not_an_image.jpg      # Text file pretending to be JPEG
+│   ├── corrupt_image.png     # Truncated PNG (fails full pixel load)
+│   └── too_small.png         # 32x32 image (below 64x64 minimum dimension)
+├── scripts/
+│   ├── create_admin.py       # Admin initialization
+│   ├── seed_users.py         # Demo user seeding (operator1, supervisor1, admin1)
+│   ├── run_evaluation.py     # Standalone evaluation command
+│   └── capture_browser_demo.py # Playwright automated UI verification
+├── SHA256SUMS.txt            # Authoritative SHA-256 checksums of model & datasets
+├── project_graph.json        # Graph Engineering dependency graph
+├── loop_log.md               # Loop Engineering continuous iteration log
+├── docker-compose.yml        # PostgreSQL + Django production containerization
+├── Makefile                  # Automation targets
+├── requirements.txt          # Python application dependencies
+└── README.md
 ```
 
----
-
-## 3. Demo Credentials
-
-| Role | Username | Password | Key Permissions |
-|---|---|---|---|
-| **Administrator** | `admin_demo` | `AdminDemo!2026` | Upload PDF manuals, register machines, full control |
-| **Engineer** | `engineer_demo` | `EngineerDemo!2026` | Select machine, ask questions, view own history |
-| **Supervisor** | `supervisor_demo` | `SupervisorDemo!2026` | Read-only audit trail, review flagged/unanswered queries |
+### Technology Stack:
+- **Backend:** Python 3.12+, Django 5.1, Django REST Framework, SimpleJWT, django-cors-headers, NumPy, Pillow, python-dotenv.
+- **Database:** PostgreSQL (with SQLite development fallback).
+- **Frontend:** HTML5, CSS3, JavaScript (Fetch API), Bootstrap 5, Bootstrap Icons. No heavy frontend frameworks (no React/Next.js).
+- **Testing:** Pytest, pytest-django, Playwright.
 
 ---
 
-## 4. Quick Start & Execution
+## 3. Role-Based Access Control (RBAC)
 
-### Option A: Local Python Environment
+The system enforces role permissions at the backend API level using DRF permission classes:
 
-1. **Activate virtual environment**:
-   ```powershell
-   # Windows PowerShell:
-   .\venv\Scripts\Activate.ps1
-   # macOS / Linux:
-   source venv/bin/activate
-   ```
+| Role | Permissions & Capabilities |
+| :--- | :--- |
+| **Operator** | Log in, upload plate photos, inspect results, view own historical inspections. Attempting to review returns **403 Forbidden**. Attempting to view another operator's inspection returns **403 Forbidden**. |
+| **Supervisor** | View all operator inspections, record append-only reviews (`CONFIRMED` / `OVERRIDDEN`), view evaluation metrics dashboard, run fresh benchmarks. |
+| **Admin** | All supervisor capabilities + manage system users (`/api/users/`) and verify SHA-256 model checksums (`/api/model/integrity/`). |
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Apply database migrations**:
-   ```bash
-   python manage.py makemigrations accounts machines manuals history dashboard
-   python manage.py migrate
-   ```
-
-4. **Seed demo users & index official manuals**:
-   ```bash
-   python scripts/seed_data.py
-   ```
-
-5. **Run the development server**:
-   ```bash
-   python manage.py runserver 127.0.0.1:8000
-   ```
-
-6. Open your browser at **`http://127.0.0.1:8000/`**.
+Unauthenticated requests to protected endpoints return **401 Unauthorized**.
 
 ---
 
-### Option B: Docker Compose (Full PostgreSQL)
+## 4. Setup & Installation
 
+### Prerequisites
+- Python 3.12 or higher
+- Git
+
+### 1. Clone & Create Virtual Environment
 ```bash
-docker compose up --build -d
-docker compose exec web python scripts/seed_data.py
+python -m venv venv
+# On Windows:
+.\venv\Scripts\activate
+# On Linux/macOS:
+source venv/bin/activate
 ```
 
----
-
-## 5. Automated Verification & Test Suite
-
-All 16 unit, integration, and scenario tests pass:
-
+### 2. Install Dependencies
 ```bash
-python manage.py test tests
+pip install -r requirements.txt
 ```
 
-### Verified Test Cases:
-- **Mandatory Test 1 (`test_role_permissions.py`)**: Engineer attempts manual upload; server rejects with `HTTP 403 Forbidden` and zero records created.
-- **Mandatory Test 2 (`test_machine_isolation.py`)**: Ingests chunks for `M-HP200` and `M-AC90`. Search on `M-HP200` returns 0 `M-AC90` chunks; search on `M-AC90` returns 0 `M-HP200` chunks.
-- **Scenario 1 (`test_end_to_end.py`)**: Supported Question ("What does E17 mean?") -> Retrieves `HP-OPS-01`, generates grounded answer, cites Page 2 with URL `#page=2`.
-- **Scenario 2 (`test_end_to_end.py`)**: Multi-Document Question ("What should be inspected during maintenance, and what operating limits should be checked?") -> Retrieves from both `HP-OPS-01` and `HP-MNT-01`, cites both.
-- **Scenario 3 (`test_end_to_end.py`)**: Machine Isolation -> Select `HP-200`, ask `AC-90` question -> Returns `INSUFFICIENT_EVIDENCE`.
-- **Scenario 4 (`test_end_to_end.py`)**: Unsupported Question -> Asks about supplier pump price -> Returns `INSUFFICIENT_EVIDENCE` and persists in supervisor queue.
-- **Scenario 5 (`test_end_to_end.py`)**: Role Security -> Engineer upload returns 403; Supervisor can access query logs.
+### 3. Environment Configuration
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Key configuration parameters in `.env`:
+```ini
+DEBUG=True
+SECRET_KEY=your-secure-django-secret-key
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0,testserver
+
+# Database options: 'sqlite' or 'postgresql'
+DB_ENGINE=sqlite
+DB_NAME=plate_inspection_db
+DB_USER=plate_user
+DB_PASSWORD=plate_secure_password
+DB_HOST=localhost
+DB_PORT=5432
+
+# Image Validation Limits
+MIN_IMAGE_DIM=64
+MAX_IMAGE_SIZE_MB=10
+```
+
+### 4. Database Migrations
+```bash
+python manage.py makemigrations accounts inspections reviews evaluation
+python manage.py migrate
+```
+
+### 5. Seed Demonstration Users
+```bash
+python scripts/seed_users.py
+```
+This provisions three demo accounts:
+- **Operator:** `operator1` / `Operator123!`
+- **Supervisor:** `supervisor1` / `Supervisor123!`
+- **Admin:** `admin1` / `Admin123!`
 
 ---
 
-## 6. End-to-End Demonstration Scenarios Guide
+## 5. Running the Application
 
-In the web interface:
+### Start Development Server
+```bash
+python manage.py runserver 127.0.0.1:8000
+```
+Open your browser to: **`http://127.0.0.1:8000`**
 
-1. **Sign in as Engineer** (`engineer_demo` / `EngineerDemo!2026`).
-2. **Scenario 1 — Supported Alarm Question**:
-   - Machine: `HP-200`
-   - Ask: `"What does E17 mean?"`
-   - **Result**: Explains Main Ram Proportional Valve failure, diagnostic steps, cites `HP-OPS-01` Page 2. Click **"Open PDF Page"** to view page 2 in the browser PDF viewer.
-3. **Scenario 2 — Multi-Document Question**:
-   - Machine: `HP-200`
-   - Ask: `"What should be inspected during maintenance, and what operating limits should be checked?"`
-   - **Result**: Cites both `HP-OPS-01` (250 bar limit, 120 L oil) and `HP-MNT-01` (daily inspections, weekly column greasing, filter intervals).
-4. **Scenario 3 — Machine Isolation**:
-   - Machine: `HP-200`
-   - Ask: `"What is the AC-90 rated discharge pressure?"`
-   - **Result**: Returns `"The available manuals do not contain enough information to answer this question."` (Status: `INSUFFICIENT_EVIDENCE`).
-5. **Scenario 4 — Unsupported Question**:
-   - Machine: `HP-200`
-   - Ask: `"What is the pump replacement price from the supplier?"`
-   - **Result**: Returns insufficient evidence.
-6. **Scenario 5 — Supervisor & Admin Roles**:
-   - Sign in as **Supervisor** (`supervisor_demo` / `SupervisorDemo!2026`): Visit **Supervisor Overview** to review analytics and the flagged unanswered queries from Scenario 3 & 4.
-   - Sign in as **Administrator** (`admin_demo` / `AdminDemo!2026`): Visit **Machine Manuals** to upload new manuals or register equipment.
+### Running via Docker Compose (PostgreSQL + App)
+```bash
+docker-compose up --build
+```
+
+---
+
+## 6. Testing & Quality Verification
+
+### Run Complete Pytest Suite
+```bash
+pytest backend/tests/ -v
+```
+The test suite validates:
+1. `test_upload_validation.py`: Clean rejection of `not_an_image.jpg`, `corrupt_image.png`, `too_small.png` with error codes (`NOT_AN_IMAGE`, `CORRUPT_IMAGE`, `TOO_SMALL`) and zero completed inspections stored.
+2. `test_prediction_persistence.py`: Valid plate upload persists all 4 fields + `model_version`.
+3. `test_model_service_parity.py`: Zero drift between `model_service.predict_plate` and `Model/inference.py`.
+4. `test_role_permissions.py`: 401 unauthenticated, 403 operator isolation, 403 operator review restriction.
+5. `test_review_append_only.py`: Append-only review history, immutability of completed inspections, prevention of review deletions.
+6. `test_evaluation_metrics.py`: 2x2 confusion matrix orientation, recall formula, explicit tracking of missing/failed images, FN=0 limitation statement.
+7. `test_integrity_verification.py`: 100% SHA-256 checksum matching on clean files; detection of tampered copies.
+8. `test_end_to_end.py`: Full operational lifecycle from login to upload, prediction, review, and evaluation.
+
+### Run Model Evaluation Management Command
+```bash
+python manage.py run_evaluation
+```
+Console output:
+```
+BIT-PLATE-CV-1.0 EVALUATION REPORT
+Model Version: BIT-PLATE-CV-1.0
+Total Samples: 60
+Successful:    60
+Failed:        0
+
+2x2 CONFUSION MATRIX (rows = actual, columns = predicted):
+------------------------------------------------------------
+                     | Pred Normal (0)    | Pred Defective (1)
+------------------------------------------------------------
+Actual Normal (0)    | 30                 (TN) | 0                  (FP)
+Actual Defective (1) | 0                  (FN) | 30                 (TP)
+------------------------------------------------------------
+Defect Recall (TP / (TP+FN)):  100.00%
+Overall Accuracy:              100.00%
+Precision:                     100.00%
+
+LIMITATION STATEMENT:
+no false negatives occurred, but 60 synthetic development images cannot establish real-world reliability.
+```
+
+### Run Model Inference CLI Directly
+```bash
+python Model/inference.py Samples/images/inspection_001.png
+```
+Output:
+```json
+{"predicted_class": 0, "confidence": 0.9826, "defect_probability": 0.0174, "model_version": "BIT-PLATE-CV-1.0"}
+```
+
+---
+
+## 7. API Reference
+
+| Endpoint | Method | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/auth/login/` | POST | Public | Authenticate user, returns access & refresh JWT tokens + user profile |
+| `/api/auth/refresh/` | POST | Public | Refresh expired access token |
+| `/api/auth/logout/` | POST | Authenticated | Blacklist refresh token & clear session |
+| `/api/auth/me/` | GET | Authenticated | Retrieve current user profile and role |
+| `/api/inspections/` | POST | Authenticated | Upload image (multipart), validate, run inference, persist record |
+| `/api/inspections/` | GET | Authenticated | List inspections (Operator sees own; Supervisor/Admin sees all) |
+| `/api/inspections/{id}/` | GET | Authenticated | Retrieve inspection ticket details (Operator restricted to own) |
+| `/api/inspections/{id}/reviews/` | POST | Supervisor/Admin | Append supervisor audit review (`CONFIRMED`/`OVERRIDDEN`) |
+| `/api/inspections/{id}/reviews/` | GET | Authenticated | List all append-only reviews on inspection |
+| `/api/evaluation/` | GET | Supervisor/Admin | Retrieve latest benchmark evaluation report |
+| `/api/evaluation/run/` | POST | Supervisor/Admin | Trigger fresh benchmark evaluation across all 60 samples |
+| `/api/model/integrity/` | GET | Admin | Verify SHA-256 checksums against `SHA256SUMS.txt` |
+| `/api/users/` | GET/POST | Admin | List system users or register new user with role |
 

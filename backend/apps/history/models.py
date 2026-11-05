@@ -1,7 +1,7 @@
 from django.db import models
 from django.conf import settings
-from backend.apps.machines.models import Machine
-from backend.apps.manuals.models import Manual, DocumentChunk
+from apps.machines.models import Machine
+from apps.manuals.models import Manual, DocumentChunk
 
 class QuestionHistory(models.Model):
     class Status(models.TextChoices):
@@ -24,6 +24,7 @@ class QuestionHistory(models.Model):
     retrieved_sources = models.JSONField(default=list, blank=True)
 
     class Meta:
+        app_label = "history"
         ordering = ["-timestamp"]
         verbose_name_plural = "Question histories"
 
@@ -57,6 +58,7 @@ class SourceReference(models.Model):
     pdf_url = models.CharField(max_length=255, blank=True, default="")
 
     class Meta:
+        app_label = "history"
         ordering = ["document_name", "pdf_page"]
 
     def __str__(self):

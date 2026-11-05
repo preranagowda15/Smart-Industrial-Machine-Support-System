@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In - Plate Inspection System (BIT-PLATE-CV-1.0)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 1.5rem;
+        }
+        .login-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 440px;
+            overflow: hidden;
+        }
+        .login-header {
+            background-color: #1e293b;
+            color: #ffffff;
+            padding: 1.75rem 2rem;
+            text-align: center;
+            border-bottom: 2px solid #2563eb;
+        }
+        .demo-pill {
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 0.8rem;
+        }
+        .demo-pill:hover {
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <div class="login-header">
+            <div class="fs-4 fw-bold">
+                <i class="bi bi-disc-fill text-primary me-2"></i>BIT-PLATE-CV
+            </div>
+            <div class="text-secondary small mt-1">Quality Inspection System (P-PLATE01)</div>
+            <div class="badge bg-secondary mt-2">Model: BIT-PLATE-CV-1.0</div>
+        </div>
+
+        <div class="p-4">
+            <div id="login-error" class="alert alert-danger d-none" role="alert"></div>
+
+            <form id="login-form">
+                <div class="mb-3">
+                    <label for="username" class="form-label fw-semibold text-secondary small">Username</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-person"></i></span>
+                        <input type="text" class="form-control" id="username" required autocomplete="username" placeholder="Enter username">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label fw-semibold text-secondary small">Password</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light"><i class="bi bi-lock"></i></span>
+                        <input type="password" class="form-control" id="password" required autocomplete="current-password" placeholder="Enter password">
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold" id="login-submit-btn">
+                    <span id="btn-text"><i class="bi bi-box-arrow-in-right me-1"></i> Sign In</span>
+                    <span id="btn-spinner" class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
+            </form>
+
+            <div class="mt-4 pt-3 border-top">
+                <div class="text-muted small fw-bold text-uppercase mb-2 text-center" style="letter-spacing: 0.5px;">Quick Demo Accounts</div>
+                <div class="d-flex flex-column gap-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm demo-pill text-start" onclick="fillCredentials('operator1', 'Operator123!')">
+                        <i class="bi bi-person-badge me-1"></i> <strong>Operator:</strong> operator1 <span class="text-muted">(Uploads & inspects)</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-warning btn-sm demo-pill text-start text-dark" onclick="fillCredentials('supervisor1', 'Supervisor123!')">
+                        <i class="bi bi-clipboard-check me-1"></i> <strong>Supervisor:</strong> supervisor1 <span class="text-muted">(Reviews & evaluation)</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-danger btn-sm demo-pill text-start" onclick="fillCredentials('admin1', 'Admin123!')">
+                        <i class="bi bi-shield-lock me-1"></i> <strong>Admin:</strong> admin1 <span class="text-muted">(User management & integrity)</span>
+                    </button>
+                </div>
+
+                <div class="text-center mt-3 pt-2">
+                    <span class="text-muted small">New operator?</span>
+                    <a href="/register/" class="text-primary small fw-semibold ms-1">Register Account</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+    <script>
+        function fillCredentials(u, p) {
+            document.getElementById('username').value = u;
+            document.getElementById('password').value = p;
+        }
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errorDiv = document.getElementById('login-error');
+            const submitBtn = document.getElementById('login-submit-btn');
+            const btnText = document.getElementById('btn-text');
+            const btnSpinner = document.getElementById('btn-spinner');
+
+            errorDiv.classList.add('d-none');
+            errorDiv.textContent = '';
+            btnText.classList.add('d-none');
+            btnSpinner.classList.remove('d-none');
+            submitBtn.disabled = true;
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch('/api/auth/login/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await res.json();
+                if (res.ok) {
+                    Auth.setSession({ access: data.access, refresh: data.refresh }, data.user);
+                    window.location.href = '/upload/';
+                } else {
+                    let errMsg = 'Authentication failed.';
+                    if (data.detail) errMsg = data.detail;
+                    else if (typeof data === 'object') {
+                        errMsg = Object.values(data).flat().join(' ');
+                    }
+                    errorDiv.textContent = errMsg;
+                    errorDiv.classList.remove('d-none');
+                }
+            } catch (err) {
+                errorDiv.textContent = 'Network or server connection error.';
+                errorDiv.classList.remove('d-none');
+            } finally {
+                btnText.classList.remove('d-none');
+                btnSpinner.classList.add('d-none');
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
+

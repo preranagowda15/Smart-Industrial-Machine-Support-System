@@ -3,8 +3,8 @@ from pathlib import Path
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from backend.apps.accounts.models import User
-from backend.apps.machines.models import Machine
+from apps.accounts.models import User
+from apps.machines.models import Machine
 from backend.services.embedding_service import EmbeddingService
 from backend.services.vector_store import VectorStoreService, VectorCollection
 from backend.services.retrieval_service import RetrievalService

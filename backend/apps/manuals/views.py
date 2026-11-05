@@ -8,8 +8,8 @@ from django.db import transaction
 
 from .models import Manual, DocumentChunk
 from .serializers import ManualSerializer, DocumentChunkSerializer
-from backend.apps.machines.models import Machine
-from backend.apps.accounts.permissions import IsAdministrator
+from apps.machines.models import Machine
+from apps.accounts.permissions import IsAdministrator
 from backend.services.pdf_processor import PDFProcessor
 from backend.services.chunking_service import ChunkingService
 from backend.services.embedding_service import EmbeddingService

@@ -1,140 +1,166 @@
+"""
+Django settings for Plate Inspection System (BIT-PLATE-CV-1.0)
+"""
+
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from datetime import timedelta
 from dotenv import load_dotenv
 
-# Base directory is the workspace root
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+# Build paths: BASE_DIR is the project root (plate-inspection/)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = BACKEND_DIR.parent
 
 # Load environment variables
-load_dotenv(BASE_DIR / ".env")
+load_dotenv(BASE_DIR / '.env')
 
-SECRET_KEY = os.getenv("SECRET_KEY", "manufacturing-manual-assistant-secret-key-eval-2026")
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
-ALLOWED_HOSTS = [x.strip() for x in os.getenv("ALLOWED_HOSTS", "*").split(",") if x.strip()]
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-bit-plate-cv-default-secret-key-123456789')
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
+ALLOWED_HOSTS = [h.strip() for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0,testserver').split(',') if h.strip()]
+if 'testserver' not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append('testserver')
+
+# Application definition
 INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "django.contrib.staticfiles",
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
 
     # Third-party apps
-    "rest_framework",
-    "rest_framework_simplejwt",
-    "corsheaders",
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
 
-    # Modular internal apps
-    "backend.apps.accounts",
-    "backend.apps.machines",
-    "backend.apps.manuals",
-    "backend.apps.history",
-    "backend.apps.assistant",
-    "backend.apps.dashboard",
+    # Local apps
+    'apps.accounts.apps.AccountsConfig',
+    'apps.machines.apps.MachinesConfig',
+    'apps.manuals.apps.ManualsConfig',
+    'apps.history.apps.HistoryConfig',
+    'apps.assistant.apps.AssistantConfig',
+    'apps.dashboard.apps.DashboardConfig',
+    'apps.inspections.apps.InspectionsConfig',
+    'apps.reviews.apps.ReviewsConfig',
+    'apps.evaluation.apps.EvaluationConfig',
 ]
-
-AUTH_USER_MODEL = "accounts.User"
 
 MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = "backend.config.urls"
+ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
     {
-        "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "frontend" / "templates"],
-        "APP_DIRS": True,
-        "OPTIONS": {
-            "context_processors": [
-                "django.template.context_processors.debug",
-                "django.template.context_processors.request",
-                "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'frontend' / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = "backend.config.wsgi.application"
-ASGI_APPLICATION = "backend.config.asgi.application"
+WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database Configuration (PostgreSQL with SQLite fallback)
-DATABASE_URL = os.getenv("DATABASE_URL", "")
-if DATABASE_URL and DATABASE_URL.startswith("postgres"):
-    u = urlparse(DATABASE_URL)
+# Database
+# Support PostgreSQL and SQLite (fallback / local dev)
+DB_ENGINE = os.getenv('DB_ENGINE', 'sqlite').lower()
+
+if DB_ENGINE == 'postgresql':
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": u.path.lstrip("/"),
-            "USER": u.username,
-            "PASSWORD": u.password,
-            "HOST": u.hostname,
-            "PORT": u.port or 5432,
-            "CONN_MAX_AGE": 60,
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('DB_NAME', 'plate_inspection_db'),
+            'USER': os.getenv('DB_USER', 'plate_user'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 'plate_secure_password'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
         }
     }
 else:
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
+# Custom User Model
+AUTH_USER_MODEL = 'accounts.User'
+
+# Password validation
 AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 6}},
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator', 'OPTIONS': {'min_length': 6}},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "Asia/Kolkata"
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "frontend" / "static"]
-STATIC_ROOT = BASE_DIR / "staticfiles"
+# Static files (CSS, JavaScript, Images)
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'frontend' / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Media files (Uploads)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# REST Framework & JWT Configuration
+# REST Framework Configuration
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
-        "rest_framework.authentication.SessionAuthentication",
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.accounts.authentication.CsrfExemptSessionAuthentication',
     ],
-    "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
-from datetime import timedelta
+# Simple JWT Configuration
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=8),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
-    "ROTATE_REFRESH_TOKENS": False,
-    "ALGORITHM": "HS256",
-    "SIGNING_KEY": SECRET_KEY,
-    "AUTH_HEADER_TYPES": ("Bearer",),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=int(os.getenv('JWT_ACCESS_MINUTES', 60))),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=int(os.getenv('JWT_REFRESH_DAYS', 7))),
+    'ROTATE_REFRESH_TOKENS': False,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
 }
 
+# CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
-LOGIN_URL = "/login/"
-LOGIN_REDIRECT_URL = "/"
-LOGOUT_REDIRECT_URL = "/login/"
+# Image Validation Limits
+MIN_IMAGE_DIM = int(os.getenv('MIN_IMAGE_DIM', 64))
+MAX_IMAGE_SIZE_MB = int(os.getenv('MAX_IMAGE_SIZE_MB', 10))
 
+# Project Specific Paths
+MODEL_DIR = BASE_DIR / 'Model'
+SAMPLES_DIR = BASE_DIR / 'Samples'
+VALIDATION_DIR = BASE_DIR / 'Validation'
+SHA256SUMS_PATH = BASE_DIR / 'SHA256SUMS.txt'

@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Model Evaluation &amp; Metrics Dashboard{% endblock %}
+{% block page_heading %}Model Evaluation &amp; Confusion Matrix{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-xl-11 mx-auto">
+    <!-- Notice Banner -->
+    <div class="alert alert-secondary py-2 px-3 small d-flex align-items-center justify-content-between mb-3 border">
+      <div>
+        <i class="bi bi-shield-check text-success me-2 fs-6"></i>
+        <span>Benchmark Evaluation: <strong>60 independently labeled synthetic samples</strong> (30 Normal &bull; 30 Defective) &bull; Model: <strong>BIT-PLATE-CV-1.0</strong></span>
+      </div>
+      <button id="btn-re-evaluate" class="btn btn-sm btn-outline-primary py-0 px-2">
+        <i class="bi bi-arrow-clockwise me-1"></i>Re-evaluate
+      </button>
+    </div>
+
+    <!-- Summary KPI Cards -->
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card shadow-sm border-start border-4 border-primary">
+          <div class="card-body py-3">
+            <small class="text-secondary text-uppercase fw-bold" style="font-size: 0.72rem;">Defect Recall</small>
+            <div class="d-flex align-items-baseline gap-2 mt-1">
+              <h3 class="mb-0 fw-bold text-dark" id="metric-defect-recall">--%</h3>
+              <small class="text-success fw-semibold">TP / (TP + FN)</small>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Proportion of defective plates caught</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card shadow-sm border-start border-4 border-success">
+          <div class="card-body py-3">
+            <small class="text-secondary text-uppercase fw-bold" style="font-size: 0.72rem;">Overall Accuracy</small>
+            <div class="d-flex align-items-baseline gap-2 mt-1">
+              <h3 class="mb-0 fw-bold text-dark" id="metric-accuracy">--%</h3>
+              <small class="text-muted fw-semibold">(TP + TN) / Total</small>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Across all 60 test images</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card shadow-sm border-start border-4 border-info">
+          <div class="card-body py-3">
+            <small class="text-secondary text-uppercase fw-bold" style="font-size: 0.72rem;">Defect Precision</small>
+            <div class="d-flex align-items-baseline gap-2 mt-1">
+              <h3 class="mb-0 fw-bold text-dark" id="metric-precision">--%</h3>
+              <small class="text-info fw-semibold">TP / (TP + FP)</small>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">Proportion of positive calls correct</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="card shadow-sm border-start border-4 border-dark">
+          <div class="card-body py-3">
+            <small class="text-secondary text-uppercase fw-bold" style="font-size: 0.72rem;">Benchmark Set</small>
+            <div class="d-flex align-items-baseline gap-2 mt-1">
+              <h3 class="mb-0 fw-bold text-dark" id="metric-total-samples">60</h3>
+              <small class="text-secondary fw-semibold">Samples</small>
+            </div>
+            <small class="text-muted" style="font-size: 0.75rem;">30 Normal &bull; 30 Defective</small>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+      <!-- 2x2 Confusion Matrix -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-grid-3x3 text-primary me-2"></i>2 &times; 2 Confusion Matrix</h6>
+            <span class="badge bg-light text-dark border">Decision Threshold: 0.50</span>
+          </div>
+          <div class="card-body p-4">
+            <div class="table-responsive">
+              <table class="table table-bordered text-center align-middle mb-0" style="table-layout: fixed;">
+                <thead>
+                  <tr>
+                    <th style="width: 28%;" class="bg-light"></th>
+                    <th style="width: 36%;" class="bg-light fw-bold text-secondary">Predicted Normal</th>
+                    <th style="width: 36%;" class="bg-light fw-bold text-secondary">Predicted Defective</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <th class="bg-light fw-bold text-secondary text-start ps-3">Actual Normal</th>
+                    <!-- True Negative (TN) -->
+                    <td class="p-3" style="background-color: #f0fdf4;">
+                      <div class="fw-bold text-success fs-3" id="cm-tn">--</div>
+                      <small class="text-success fw-semibold">True Negative (TN)</small>
+                      <div class="text-muted small" style="font-size: 0.72rem;">Correctly passed</div>
+                    </td>
+                    <!-- False Positive (FP) -->
+                    <td class="p-3" style="background-color: #fffbeb;">
+                      <div class="fw-bold text-warning fs-3" id="cm-fp">--</div>
+                      <small class="text-warning text-dark fw-semibold">False Positive (FP)</small>
+                      <div class="text-muted small" style="font-size: 0.72rem;">Normal misflagged</div>
+                    </td>
+                  </tr>
+                  <tr>
+                    <th class="bg-light fw-bold text-secondary text-start ps-3">Actual Defective</th>
+                    <!-- False Negative (FN) -->
+                    <td class="p-3" style="background-color: #fef2f2;">
+                      <div class="fw-bold text-danger fs-3" id="cm-fn">--</div>
+                      <small class="text-danger fw-semibold">False Negative (FN)</small>
+                      <div class="text-muted small" style="font-size: 0.72rem;">Defect missed</div>
+                    </td>
+                    <!-- True Positive (TP) -->
+                    <td class="p-3" style="background-color: #eff6ff;">
+                      <div class="fw-bold text-primary fs-3" id="cm-tp">--</div>
+                      <small class="text-primary fw-semibold">True Positive (TP)</small>
+                      <div class="text-muted small" style="font-size: 0.72rem;">Defect detected</div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="mt-3 p-3 bg-light rounded border small">
+              <strong class="d-block text-secondary mb-1">Mathematical Metric Formulations:</strong>
+              <div class="row g-2 font-monospace text-dark">
+                <div class="col-6">&bull; Recall = TP / (TP + FN)</div>
+                <div class="col-6">&bull; Precision = TP / (TP + FP)</div>
+                <div class="col-6">&bull; Accuracy = (TP + TN) / Total</div>
+                <div class="col-6">&bull; Specificity = TN / (TN + FP)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Model Scope & Limitations (Challenge Requirement) -->
+      <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-white py-3 border-bottom">
+            <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-exclamation-octagon text-warning me-2"></i>Model Scope &amp; Technical Limitations</h6>
+          </div>
+          <div class="card-body">
+            <div class="d-flex flex-column gap-3">
+              <div class="p-3 rounded bg-light border">
+                <div class="fw-bold text-dark mb-1"><i class="bi bi-aspect-ratio text-primary me-2"></i>1. Fixed Cropping Window [16:112]</div>
+                <p class="text-muted small mb-0">
+                  The model resizes images to 128&times;128 and inspects only the central 96&times;96 area (rows 16&ndash;111). Defect scratches or pits positioned near the extreme perimeter or outside the center may be missed if the plate is misaligned.
+                </p>
+              </div>
+
+              <div class="p-3 rounded bg-light border">
+                <div class="fw-bold text-dark mb-1"><i class="bi bi-sliders text-info me-2"></i>2. Fixed 0.50 Decision Threshold</div>
+                <p class="text-muted small mb-0">
+                  The binary decision boundary is locked at defect probability &ge; 0.50. In safety-critical aerospace or automotive applications, a lower threshold (e.g. 0.20) would typically be favored to drive False Negatives strictly to zero.
+                </p>
+              </div>
+
+              <div class="p-3 rounded bg-light border">
+                <div class="fw-bold text-dark mb-1"><i class="bi bi-cpu text-dark me-2"></i>3. Educational 17-Feature Handcrafted Representation</div>
+                <p class="text-muted small mb-0">
+                  The classifier computes 17 residual intensity quantiles and pixel gradient statistics fitted with Logistic Regression. It does not learn spatial hierarchies like a Convolutional Neural Network (CNN) or Vision Transformer (ViT).
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Benchmark Samples Explorer (All 60 Samples) -->
+    <div class="card shadow-sm">
+      <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-images text-primary me-2"></i>Benchmark Sample Explorer (All 60 Labeled Samples)</h6>
+          <small class="text-muted">Synthetic test set evaluated against frozen BIT-PLATE-CV-1.0</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <label class="small text-secondary mb-0">Filter Label:</label>
+          <select id="filter-samples-class" class="form-select form-select-sm" style="width: auto;">
+            <option value="">All 60 Samples</option>
+            <option value="Normal">Normal (30)</option>
+            <option value="Defective">Defective (30)</option>
+          </select>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+          <table class="table table-sm table-hover align-middle mb-0" id="samples-table">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 50px;">#</th>
+                <th>Sample File</th>
+                <th>Ground Truth Label</th>
+                <th>Model Prediction</th>
+                <th>Confidence</th>
+                <th>Defect Prob (p)</th>
+                <th>Outcome Status</th>
+              </tr>
+            </thead>
+            <tbody id="samples-tbody">
+              <tr>
+                <td colspan="7" class="text-center py-5 text-muted">
+                  <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                  Evaluating benchmark samples...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/inspection_metrics.js' %}?v=1.0"></script>
+{% endblock %}
+

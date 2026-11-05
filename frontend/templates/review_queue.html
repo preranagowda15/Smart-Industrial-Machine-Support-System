@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Review Queue{% endblock %}
+{% block page_title %}Supervisor Quality Review Queue{% endblock %}
+
+{% block content %}
+<div class="card card-industrial">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+            <i class="bi bi-inbox-fill me-2 text-warning"></i>
+            <span class="fw-bold">Pending Review Queue</span>
+            <span class="badge bg-warning text-dark ms-2" id="queue-pending-count">0 Pending</span>
+        </div>
+        <button class="btn btn-outline-secondary btn-sm" onclick="loadQueue()">
+            <i class="bi bi-arrow-clockwise me-1"></i> Refresh Queue
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th style="width: 70px;">Plate</th>
+                        <th>Operator</th>
+                        <th>Model Prediction</th>
+                        <th>Confidence</th>
+                        <th>Defect Probability</th>
+                        <th>Uploaded Time</th>
+                        <th style="width: 140px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="queue-table-body">
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <span class="spinner-border spinner-border-sm me-2"></span> Loading review queue...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadQueue() {
+        const tbody = document.getElementById('queue-table-body');
+        const countBadge = document.getElementById('queue-pending-count');
+
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading review queue...</td></tr>';
+
+        try {
+            const res = await apiFetch('/inspections/?unreviewed=true');
+            if (!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-danger">Failed to load review queue.</td></tr>';
+                return;
+            }
+
+            const data = await res.json();
+            countBadge.textContent = `${data.length} Pending`;
+
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><i class="bi bi-check2-all text-success fs-4 d-block mb-1"></i>All inspections have been reviewed!</td></tr>';
+                return;
+            }
+
+            let rows = '';
+            data.forEach(item => {
+                const isDefective = item.predicted_class === 1;
+                const classBadge = isDefective 
+                    ? '<span class="badge-defective"><i class="bi bi-exclamation-triangle-fill me-1"></i>Defective</span>'
+                    : '<span class="badge-normal"><i class="bi bi-check-circle-fill me-1"></i>Normal</span>';
+
+                const confPct = Math.round((item.confidence || 0) * 100);
+                const defectPct = Math.round((item.defect_probability || 0) * 100);
+                const timeStr = new Date(item.created_at).toLocaleString();
+
+                rows += `
+                    <tr>
+                        <td class="fw-bold">#${item.id}</td>
+                        <td>
+                            <img src="${item.image}" alt="thumb" class="rounded border" style="width: 48px; height: 48px; object-fit: cover;">
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark">${item.username}</div>
+                            <div class="text-muted small" style="font-size: 0.75rem;">${item.user_role}</div>
+                        </td>
+                        <td>${classBadge}</td>
+                        <td class="fw-semibold">${confPct}%</td>
+                        <td class="fw-semibold text-danger">${defectPct}%</td>
+                        <td class="text-muted small">${timeStr}</td>
+                        <td class="text-end">
+                            <a href="/inspections/${item.id}/" class="btn btn-warning btn-sm text-dark fw-semibold">
+                                <i class="bi bi-pencil-square me-1"></i> Review
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-danger">Network error: ' + err.message + '</td></tr>';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadQueue);
+</script>
+{% endblock %}
+

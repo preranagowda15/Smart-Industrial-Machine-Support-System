@@ -6,7 +6,7 @@ from django.shortcuts import get_object_or_404
 
 from .models import QuestionHistory
 from .serializers import QuestionHistorySerializer
-from backend.apps.accounts.permissions import role_of
+from apps.accounts.permissions import role_of
 
 class QuestionHistoryListAPIView(APIView):
     permission_classes = [IsAuthenticated]

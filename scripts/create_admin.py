@@ -1,39 +1,42 @@
+#!/usr/bin/env python
 """
-Create administrator user utility.
+scripts/create_admin.py - Create or update primary admin user
 """
+
 import os
 import sys
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE_DIR / 'backend'))
 sys.path.insert(0, str(BASE_DIR))
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.config.settings")
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
 import django
 django.setup()
 
-from backend.apps.accounts.models import User
+from apps.accounts.models import User
 
-def create_admin(username="admin", email="admin@manufacturing.local", password="AdminPassword!2026"):
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'Admin123!')
+ADMIN_EMAIL = os.getenv('ADMIN_EMAIL', 'admin@plate-inspect.local')
+
+
+def create_admin():
     user, created = User.objects.get_or_create(
-        username=username,
-        defaults={
-            "email": email,
-            "role": User.Role.ADMIN,
-            "is_staff": True,
-            "is_superuser": True,
-        }
+        username=ADMIN_USERNAME,
+        defaults={'email': ADMIN_EMAIL, 'role': User.Role.ADMIN}
     )
-    user.set_password(password)
+    user.set_password(ADMIN_PASSWORD)
     user.role = User.Role.ADMIN
     user.is_staff = True
     user.is_superuser = True
     user.save()
-    action = "Created" if created else "Updated"
-    print(f"{action} admin user '{username}' (Password: {password})")
 
-if __name__ == "__main__":
-    u = sys.argv[1] if len(sys.argv) > 1 else "admin"
-    p = sys.argv[2] if len(sys.argv) > 2 else "AdminPassword!2026"
-    create_admin(username=u, password=p)
+    status = "Created" if created else "Updated"
+    print(f"[{status}] Administrator: {ADMIN_USERNAME} with role {user.role}")
+
+
+if __name__ == '__main__':
+    create_admin()
 

@@ -49,7 +49,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await resp.json();
 
       if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">No insufficient evidence or unanswered queries logged.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No insufficient evidence or unanswered queries logged.</td></tr>`;
         return;
       }
 
@@ -59,6 +59,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <td><span class="badge bg-secondary">${item.username}</span></td>
           <td><strong>${item.machine_code}</strong></td>
           <td><div class="fw-medium text-dark">${item.question}</div></td>
+          <td><div class="small text-muted">${item.answer ? item.answer.substring(0, 180) : "No answer returned"}</div></td>
           <td><span class="badge badge-insufficient">${item.status}</span></td>
         </tr>
       `).join("");
@@ -69,5 +70,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadSupervisorMetrics();
   loadUnansweredQuestions();
-});
 
+  async function loadImageReviews() {
+    const tbody = document.getElementById("supervisor-image-review-body");
+    const count = document.getElementById("supervisor-image-count");
+    if (!tbody) return;
+
+    try {
+      const resp = await App.apiFetch("/inspections/");
+      if (!resp || !resp.ok) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Unable to load submitted images.</td></tr>`;
+        return;
+      }
+      const data = await resp.json();
+      count.textContent = `${data.length} submitted`;
+      if (data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-3">No plate images submitted.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = data.slice(0, 100).map(item => {
+        const defective = item.predicted_class === 1;
+        const result = defective ? "Defective" : "Normal";
+        const confidence = Math.round((item.confidence || 0) * 100);
+        return `<tr>
+          <td><img src="${item.image}" alt="Submitted plate" class="rounded border" style="width:64px;height:64px;object-fit:cover;"></td>
+          <td><strong>${item.username || "Unknown user"}</strong><div class="small text-muted">${item.user_role || ""}</div></td>
+          <td><span class="badge ${defective ? "bg-danger" : "bg-success"}">${result}</span></td>
+          <td>${confidence}%</td>
+          <td class="small text-muted">${new Date(item.created_at).toLocaleString()}</td>
+          <td><a class="btn btn-sm btn-outline-primary" href="/inspections/${item.id}/">Open & verify</a></td>
+        </tr>`;
+      }).join("");
+    } catch (err) {
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Network error: ${err.message}</td></tr>`;
+    }
+  }
+
+  loadImageReviews();
+});

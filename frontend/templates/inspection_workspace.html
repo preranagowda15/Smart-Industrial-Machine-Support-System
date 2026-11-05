@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}AI Visual Quality Inspection{% endblock %}
+{% block page_heading %}AI Visual Quality Inspection Workspace{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-xl-11 mx-auto">
+    <!-- Architecture & Operational Notice -->
+    <div class="alert alert-secondary py-2 px-3 small d-flex align-items-center justify-content-between mb-3 border">
+      <div>
+        <i class="bi bi-cpu text-primary me-2"></i>
+        <span>Frozen Model: <strong>BIT-PLATE-CV-1.0</strong> (Logistic Regression &bull; 17 image features) &bull; Threshold: <strong>0.50</strong> &bull; Max 5 MiB JPEG/PNG (64&ndash;4096 px)</span>
+      </div>
+      <span class="badge bg-dark text-white">Pretrained Offline</span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <ul class="nav nav-tabs mb-4" id="inspectionTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-semibold" id="single-tab" data-bs-toggle="tab" data-bs-target="#single-pane" type="button" role="tab">
+          <i class="bi bi-camera me-1 text-primary"></i> Single Image Inspection
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link fw-semibold" id="batch-tab" data-bs-toggle="tab" data-bs-target="#batch-pane" type="button" role="tab">
+          <i class="bi bi-collection me-1 text-info"></i> Batch Inspection (1&ndash;10 Files)
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content" id="inspectionTabsContent">
+      <!-- ================= SINGLE INSPECTION PANE ================= -->
+      <div class="tab-pane fade show active" id="single-pane" role="tabpanel">
+        <div class="row g-4">
+          <!-- Upload Form Column -->
+          <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+              <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-upload text-primary me-2"></i>Select Product & Upload Image</h6>
+              </div>
+              <div class="card-body">
+                <form id="single-inspection-form">
+                  <div class="mb-3">
+                    <label for="single-product-select" class="form-label small fw-semibold text-secondary">Target Product:</label>
+                    <select id="single-product-select" class="form-select" required>
+                      {% for p in products %}
+                        <option value="{{ p.product_id }}" {% if forloop.first %}selected{% endif %}>
+                          {{ p.product_id }} &mdash; {{ p.product_name }}
+                        </option>
+                      {% empty %}
+                        <option value="P-PLATE01">P-PLATE01 &mdash; Demonstration metal plate</option>
+                      {% endfor %}
+                    </select>
+                    <small class="text-muted" style="font-size: 0.75rem;">Supported product profile registered by Administrator.</small>
+                  </div>
+
+                  <!-- Dropzone / File Input Area -->
+                  <div class="mb-3">
+                    <label class="form-label small fw-semibold text-secondary">Inspection Image File:</label>
+                    <div id="single-dropzone" class="border border-2 border-dashed rounded p-4 text-center bg-light" style="cursor: pointer;">
+                      <i class="bi bi-cloud-arrow-up text-primary fs-1 mb-2 d-block"></i>
+                      <div class="fw-semibold text-dark mb-1">Click to browse or drop image here</div>
+                      <small class="text-muted d-block">Accepts decoded JPEG or PNG &bull; Max 5 MiB &bull; 64x64 to 4096x4096 px</small>
+                      <input type="file" id="single-file-input" class="d-none" accept="image/jpeg,image/png">
+                    </div>
+                  </div>
+
+                  <!-- Client Preview -->
+                  <div id="single-preview-box" class="d-none mb-3 p-2 bg-white border rounded text-center">
+                    <img id="single-preview-img" src="" alt="Selected Image" class="img-fluid rounded border mb-2" style="max-height: 220px; object-fit: contain;">
+                    <div id="single-file-info" class="small text-muted fw-semibold"></div>
+                  </div>
+
+                  <!-- Quick Scenario Test Samples (for Judge Demonstration) -->
+                  <div class="mb-3 p-2 bg-light border rounded">
+                    <small class="text-muted fw-bold d-block mb-1" style="font-size: 0.72rem;">QUICK DEMO SAMPLES:</small>
+                    <div class="d-flex flex-wrap gap-1">
+                      <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2 demo-sample-btn" data-url="/data/Round2/Samples/images/inspection_001.png" data-name="inspection_001.png">
+                        Sample 001 (Normal)
+                      </button>
+                      <button type="button" class="btn btn-xs btn-outline-secondary py-1 px-2 demo-sample-btn" data-url="/data/Round2/Samples/images/inspection_003.png" data-name="inspection_003.png">
+                        Sample 003 (Defective)
+                      </button>
+                      <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 demo-sample-btn" data-url="/data/Round2/Validation/not_an_image.jpg" data-name="not_an_image.jpg">
+                        Invalid (Not Image)
+                      </button>
+                      <button type="button" class="btn btn-xs btn-outline-danger py-1 px-2 demo-sample-btn" data-url="/data/Round2/Validation/too_small.png" data-name="too_small.png">
+                        Invalid (Too Small)
+                      </button>
+                    </div>
+                  </div>
+
+                  <button type="submit" id="single-submit-btn" class="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2" disabled>
+                    <i class="bi bi-search"></i>
+                    <span>Run AI Visual Inspection</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Inspection Output Column -->
+          <div class="col-lg-7">
+            <div id="single-result-placeholder" class="card shadow-sm h-100 d-flex align-items-center justify-content-center p-5 text-center bg-light">
+              <i class="bi bi-camera-fill text-secondary opacity-50 display-1 mb-3"></i>
+              <h5 class="fw-bold text-secondary">Awaiting Inspection Image</h5>
+              <p class="text-muted small mb-0" style="max-width: 380px;">
+                Select an image on the left and run the frozen computer vision classifier to detect visible defects and record the inspection.
+              </p>
+            </div>
+
+            <div id="single-result-card" class="card shadow-sm h-100 d-none">
+              <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge bg-secondary">RESULT</span>
+                  <span id="result-inspection-id" class="small text-muted font-monospace"></span>
+                </div>
+                <span id="result-timestamp" class="small text-muted"></span>
+              </div>
+              <div class="card-body">
+                <!-- Validation Error Alert (if rejected) -->
+                <div id="result-error-alert" class="alert alert-danger d-none mb-3">
+                  <div class="d-flex align-items-center gap-2 fw-bold mb-1">
+                    <i class="bi bi-x-circle-fill"></i> Upload Validation Rejected
+                  </div>
+                  <div id="result-error-message" class="small"></div>
+                </div>
+
+                <!-- Classification Success Card -->
+                <div id="result-success-content" class="d-none">
+                  <div class="row align-items-center mb-4">
+                    <div class="col-md-5 text-center">
+                      <img id="result-image-preview" src="" alt="Inspected Plate" class="img-fluid rounded border shadow-sm p-1" style="max-height: 180px; width: 100%; object-fit: contain;">
+                      <small id="result-image-meta" class="text-muted d-block mt-1 font-monospace" style="font-size: 0.75rem;"></small>
+                    </div>
+                    <div class="col-md-7">
+                      <div class="p-3 rounded border" id="result-badge-container">
+                        <small class="text-uppercase fw-bold text-secondary d-block mb-1" style="font-size: 0.72rem;">Classification Output:</small>
+                        <div class="d-flex align-items-center gap-2 mb-2">
+                          <span id="result-class-badge" class="badge fs-4 px-3 py-2"></span>
+                        </div>
+                        <div class="mb-2">
+                          <div class="d-flex justify-content-between small text-secondary mb-1">
+                            <span>Model Confidence:</span>
+                            <strong id="result-confidence-text" class="text-dark"></strong>
+                          </div>
+                          <div class="progress" style="height: 10px;">
+                            <div id="result-confidence-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;"></div>
+                          </div>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted font-monospace">
+                          <span>Defect Probability:</span>
+                          <span id="result-defect-prob"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Model & Audit Metadata Table -->
+                  <div class="table-responsive small">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                      <tbody class="table-light">
+                        <tr>
+                          <th style="width: 35%;">Product Profile:</th>
+                          <td id="result-product-meta" class="fw-semibold"></td>
+                        </tr>
+                        <tr>
+                          <th>Classifier Model:</th>
+                          <td><span class="badge bg-dark font-monospace" id="result-model-version">BIT-PLATE-CV-1.0</span></td>
+                        </tr>
+                        <tr>
+                          <th>Decision Threshold:</th>
+                          <td><code>p &ge; 0.50 &rarr; Defective</code> &bull; <code>p &lt; 0.50 &rarr; Normal</code></td>
+                        </tr>
+                        <tr>
+                          <th>Submitted By:</th>
+                          <td id="result-submitting-user"></td>
+                        </tr>
+                        <tr>
+                          <th>Supervisor Review:</th>
+                          <td>
+                            <span class="badge bg-secondary" id="result-review-badge">Pending Supervisor Review</span>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="mt-3 text-end">
+                    <a href="/inspection/history/" class="btn btn-sm btn-outline-primary">
+                      <i class="bi bi-clock-history me-1"></i>View in Inspection History &rarr;
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= BATCH INSPECTION PANE ================= -->
+      <div class="tab-pane fade" id="batch-pane" role="tabpanel">
+        <div class="row g-4">
+          <!-- Batch Upload Form -->
+          <div class="col-lg-4">
+            <div class="card shadow-sm">
+              <div class="card-header bg-white py-3 border-bottom">
+                <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-files text-info me-2"></i>Batch Upload (1 to 10 Files)</h6>
+              </div>
+              <div class="card-body">
+                <form id="batch-inspection-form">
+                  <div class="mb-3">
+                    <label for="batch-product-select" class="form-label small fw-semibold text-secondary">Target Product:</label>
+                    <select id="batch-product-select" class="form-select" required>
+                      {% for p in products %}
+                        <option value="{{ p.product_id }}">{{ p.product_id }} &mdash; {{ p.product_name }}</option>
+                      {% empty %}
+                        <option value="P-PLATE01">P-PLATE01 &mdash; Demonstration metal plate</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label small fw-semibold text-secondary">Select 1 to 10 Images:</label>
+                    <input type="file" id="batch-files-input" class="form-control" multiple accept="image/jpeg,image/png" required>
+                    <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                      Batch processing executes in background threads. An invalid file does NOT halt valid batch items.
+                    </small>
+                  </div>
+
+                  <div id="batch-selected-count" class="alert alert-info py-2 small d-none mb-3">
+                    <span id="batch-file-count-text">0 files selected</span>
+                  </div>
+
+                  <button type="submit" id="batch-submit-btn" class="btn btn-info text-white w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2" disabled>
+                    <i class="bi bi-play-circle-fill"></i>
+                    <span>Queue &amp; Process Batch</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          <!-- Batch Progress & Results Table -->
+          <div class="col-lg-8">
+            <div id="batch-results-container" class="card shadow-sm">
+              <div class="card-header bg-white py-3 border-bottom d-flex align-items-center justify-content-between">
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-list-task text-primary me-2"></i>Batch Status Tracker</h6>
+                  <small id="batch-status-meta" class="text-muted">No active batch in progress.</small>
+                </div>
+                <span id="batch-overall-badge" class="badge bg-secondary">IDLE</span>
+              </div>
+              <div class="card-body">
+                <!-- Batch Progress Bar -->
+                <div class="mb-3">
+                  <div class="d-flex justify-content-between small text-secondary mb-1">
+                    <span id="batch-progress-label">Batch Progress: 0 / 0</span>
+                    <span id="batch-progress-percent">0%</span>
+                  </div>
+                  <div class="progress" style="height: 12px;">
+                    <div id="batch-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: 0%;"></div>
+                  </div>
+                </div>
+
+                <!-- Per-Item Status Table -->
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover align-middle mb-0" id="batch-items-table">
+                    <thead class="table-light">
+                      <tr>
+                        <th>File</th>
+                        <th>Status</th>
+                        <th>Model Prediction</th>
+                        <th>Confidence</th>
+                        <th>Defect Probability</th>
+                        <th>Remarks / Failure Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody id="batch-items-tbody">
+                      <tr>
+                        <td colspan="6" class="text-center text-muted py-4">No batch queued yet.</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/inspection_workspace.js' %}?v=1.0"></script>
+{% endblock %}
+

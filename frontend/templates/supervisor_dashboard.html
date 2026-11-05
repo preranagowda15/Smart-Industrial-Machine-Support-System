@@ -101,13 +101,39 @@
                 <th>User</th>
                 <th>Machine</th>
                 <th>Question</th>
+                <th>Answer / Evidence</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody id="supervisor-unanswered-body">
               <tr>
-                <td colspan="5" class="text-center text-muted py-3">Loading flagged queries...</td>
+                <td colspan="6" class="text-center text-muted py-3">Loading flagged queries...</td>
               </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Plate Image Review Queue -->
+      <div class="industrial-card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div><i class="bi bi-images text-primary me-2"></i>Submitted Plate Images & Model Answers</div>
+          <span class="badge bg-primary" id="supervisor-image-count">0 submitted</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Image</th>
+                <th>Engineer / User</th>
+                <th>Model Result</th>
+                <th>Confidence</th>
+                <th>Submitted</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody id="supervisor-image-review-body">
+              <tr><td colspan="6" class="text-center text-muted py-3">Loading submitted images...</td></tr>
             </tbody>
           </table>
         </div>
@@ -120,4 +146,3 @@
 {% block extra_js %}
 <script src="{% static 'js/dashboard.js' %}"></script>
 {% endblock %}
-

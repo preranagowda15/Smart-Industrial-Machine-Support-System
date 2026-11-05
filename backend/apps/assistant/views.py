@@ -5,11 +5,11 @@ from rest_framework.permissions import IsAuthenticated
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 
-from backend.apps.machines.models import Machine
-from backend.apps.manuals.models import Manual
-from backend.apps.history.models import QuestionHistory, SourceReference
-from backend.apps.history.serializers import QuestionHistorySerializer
-from backend.apps.accounts.permissions import role_of
+from apps.machines.models import Machine
+from apps.manuals.models import Manual
+from apps.history.models import QuestionHistory, SourceReference
+from apps.history.serializers import QuestionHistorySerializer
+from apps.accounts.permissions import role_of
 from backend.services.rag_service import RAGService
 
 class AskAssistantAPIView(APIView):
@@ -18,9 +18,9 @@ class AskAssistantAPIView(APIView):
     def post(self, request):
         role = role_of(request.user)
         # Supervisors have a dedicated read-only oversight role
-        if role not in ("ENGINEER", "ADMIN"):
+        if role not in ("ENGINEER", "OPERATOR", "ADMIN"):
             return Response(
-                {"detail": "Access restricted: Only Engineers (and Admins) can submit maintenance questions."},
+                {"detail": "Access restricted: Only Engineers and Operators (and Admins) can submit maintenance questions."},
                 status=status.HTTP_403_FORBIDDEN
             )
 
@@ -114,4 +114,3 @@ class AskAssistantAPIView(APIView):
                 {"detail": f"Assistant execution error: {exc}", "question_id": question_log.id},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-

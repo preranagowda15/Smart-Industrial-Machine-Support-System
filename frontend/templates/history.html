@@ -1,126 +1,141 @@
 {% extends "base.html" %}
-{% load static %}
 
-{% block title %}Question History{% endblock %}
-{% block page_heading %}Maintenance Question History{% endblock %}
+{% block title %}Inspection History{% endblock %}
+{% block page_title %}Inspection History Audit{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col-12">
-    <div class="industrial-card">
-      <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div>
-          <span class="fw-bold">Audit Trail & Past Queries</span>
-          <small class="text-muted ms-2">
-            {% if user.role == "ENGINEER" %}Showing your private question logs{% else %}Showing team-wide question logs{% endif %}
-          </small>
+<div class="card card-industrial">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-clock-history me-2 text-primary"></i>
+            <span class="fw-bold">Historical Plate Records</span>
+            <span class="badge bg-secondary ms-2" id="history-total-count">0 Records</span>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <select id="history-machine-filter" class="form-select form-select-sm" style="width: auto;">
-            <option value="">All Machines</option>
-            {% for m in machines %}
-              <option value="{{ m.machine_code }}">{{ m.machine_code }}</option>
-            {% endfor %}
-          </select>
-          <button id="history-refresh-btn" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-arrow-clockwise"></i>
-          </button>
+            <select class="form-select form-select-sm" id="filter-prediction" style="width: 140px;">
+                <option value="">All Results</option>
+                <option value="0">Normal</option>
+                <option value="1">Defective</option>
+            </select>
+            <select class="form-select form-select-sm" id="filter-review" style="width: 150px;">
+                <option value="">All Reviews</option>
+                <option value="unreviewed">Unreviewed Only</option>
+            </select>
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadHistory()">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
         </div>
-      </div>
-
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" id="history-table">
-          <thead class="table-light">
-            <tr>
-              <th style="width: 140px;">Timestamp</th>
-              {% if user.role != "ENGINEER" %}<th>User</th>{% endif %}
-              <th>Machine</th>
-              <th>Question & Grounded Answer</th>
-              <th style="width: 140px;">Evidence Status</th>
-              <th>Verifiable Sources</th>
-            </tr>
-          </thead>
-          <tbody id="history-table-body">
-            <tr>
-              <td colspan="6" class="text-center text-muted py-4">
-                <div class="spinner-border spinner-border-sm text-primary me-2"></div>
-                Loading query history...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </div>
-  </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="history-table">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 80px;">ID</th>
+                        <th style="width: 70px;">Thumbnail</th>
+                        <th>Operator</th>
+                        <th>Classification</th>
+                        <th>Confidence</th>
+                        <th>Defect Prob</th>
+                        <th>Supervisor Review</th>
+                        <th>Timestamp</th>
+                        <th style="width: 110px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="history-table-body">
+                    <tr>
+                        <td colspan="9" class="text-center py-4 text-muted">
+                            <span class="spinner-border spinner-border-sm me-2"></span> Loading inspections...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-  const tbody = document.getElementById("history-table-body");
-  const machineFilter = document.getElementById("history-machine-filter");
-  const refreshBtn = document.getElementById("history-refresh-btn");
+    async function loadHistory() {
+        const tbody = document.getElementById('history-table-body');
+        const countBadge = document.getElementById('history-total-count');
+        const predFilter = document.getElementById('filter-prediction').value;
+        const reviewFilter = document.getElementById('filter-review').value;
 
-  async function loadHistory() {
-    const mid = machineFilter.value;
-    let url = "/api/assistant/history/";
-    if (mid) url += `?machine_code=${encodeURIComponent(mid)}`;
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted"><span class="spinner-border spinner-border-sm me-2"></span> Loading inspections...</td></tr>';
 
-    try {
-      const resp = await App.apiFetch(url);
-      if (!resp || !resp.ok) return;
-      const data = await resp.json();
+        let url = '/inspections/?';
+        if (predFilter !== '') url += `predicted_class=${predFilter}&`;
+        if (reviewFilter === 'unreviewed') url += `unreviewed=true&`;
 
-      if (data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">No query logs recorded yet.</td></tr>`;
-        return;
-      }
+        try {
+            const res = await apiFetch(url);
+            if (!res.ok) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Failed to load inspections.</td></tr>';
+                return;
+            }
 
-      tbody.innerHTML = data.map(item => {
-        const isAnswered = item.status === "ANSWERED";
-        const badge = isAnswered 
-          ? `<span class="badge badge-answered"><i class="bi bi-check-circle-fill me-1"></i>ANSWERED</span>`
-          : `<span class="badge badge-insufficient"><i class="bi bi-exclamation-triangle-fill me-1"></i>INSUFFICIENT</span>`;
+            const data = await res.json();
+            countBadge.textContent = `${data.length} Records`;
 
-        const sources = (item.source_references && item.source_references.length > 0)
-          ? item.source_references.map(s => `
-              <div class="d-inline-block me-1 mb-1">
-                <a href="${s.pdf_url}" target="_blank" class="badge bg-light text-dark border text-decoration-none">
-                  <i class="bi bi-file-earmark-pdf text-danger me-1"></i>${s.document_name} p.${s.pdf_page}
-                </a>
-              </div>
-            `).join("")
-          : `<span class="text-muted small">&mdash;</span>`;
+            if (data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">No inspection records found.</td></tr>';
+                return;
+            }
 
-        const userCol = `{{ user.role }}` !== "ENGINEER" 
-          ? `<td><span class="badge bg-secondary">${item.username}</span></td>`
-          : "";
+            let rows = '';
+            data.forEach(item => {
+                const isDefective = item.predicted_class === 1;
+                const classBadge = isDefective 
+                    ? '<span class="badge-defective"><i class="bi bi-exclamation-triangle-fill me-1"></i>Defective</span>'
+                    : '<span class="badge-normal"><i class="bi bi-check-circle-fill me-1"></i>Normal</span>';
 
-        return `
-          <tr>
-            <td><small class="text-muted">${new Date(item.timestamp).toLocaleString()}</small></td>
-            ${userCol}
-            <td><span class="badge bg-light text-dark border">${item.machine_code}</span></td>
-            <td>
-              <div class="fw-bold text-dark mb-1">${item.question}</div>
-              <div class="text-secondary small" style="max-height: 80px; overflow-y: auto;">${item.answer}</div>
-            </td>
-            <td>${badge}</td>
-            <td>${sources}</td>
-          </tr>
-        `;
-      }).join("");
+                let reviewBadge = '<span class="badge bg-light text-secondary border">Unreviewed</span>';
+                if (item.latest_review) {
+                    const isConfirmed = item.latest_review.decision === 'CONFIRMED';
+                    reviewBadge = isConfirmed
+                        ? `<span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-lg me-1"></i>Confirmed (${item.latest_review.reviewer})</span>`
+                        : `<span class="badge bg-warning-subtle text-warning border border-warning"><i class="bi bi-arrow-left-right me-1"></i>Overridden (${item.latest_review.reviewer})</span>`;
+                }
 
-    } catch (err) {
-      tbody.innerHTML = `<tr><td colspan="6" class="text-danger text-center py-4">Failed to load history: ${err.message}</td></tr>`;
+                const confPct = Math.round((item.confidence || 0) * 100);
+                const defectPct = Math.round((item.defect_probability || 0) * 100);
+                const timeStr = new Date(item.created_at).toLocaleString();
+
+                rows += `
+                    <tr>
+                        <td class="fw-bold">#${item.id}</td>
+                        <td>
+                            <img src="${item.image}" alt="thumb" class="rounded border" style="width: 48px; height: 48px; object-fit: cover;">
+                        </td>
+                        <td>
+                            <div class="fw-semibold text-dark">${item.username}</div>
+                            <div class="text-muted small" style="font-size: 0.75rem;">${item.user_role}</div>
+                        </td>
+                        <td>${classBadge}</td>
+                        <td class="fw-semibold">${confPct}%</td>
+                        <td class="fw-semibold text-danger">${defectPct}%</td>
+                        <td>${reviewBadge}</td>
+                        <td class="text-muted small">${timeStr}</td>
+                        <td class="text-end">
+                            <a href="/inspections/${item.id}/" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tbody.innerHTML = rows;
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-danger">Network error: ' + err.message + '</td></tr>';
+        }
     }
-  }
 
-  machineFilter.addEventListener("change", loadHistory);
-  refreshBtn.addEventListener("click", loadHistory);
-  loadHistory();
-});
+    document.getElementById('filter-prediction').addEventListener('change', loadHistory);
+    document.getElementById('filter-review').addEventListener('change', loadHistory);
+    document.addEventListener('DOMContentLoaded', loadHistory);
 </script>
 {% endblock %}
 

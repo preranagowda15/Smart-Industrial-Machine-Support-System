@@ -1,0 +1,189 @@
+{
+  "project_name": "Plate Inspection System (BIT-PLATE-CV-1.0)",
+  "version": "1.0.0",
+  "critical_path": [
+    "ENV_SETUP",
+    "DATASET_PACK",
+    "DJANGO_CORE",
+    "ACCOUNTS_APP",
+    "SERVICES_VALIDATOR",
+    "SERVICES_MODEL_INTEGRITY",
+    "INSPECTIONS_APP",
+    "REVIEWS_APP",
+    "SERVICES_METRICS",
+    "EVALUATION_APP",
+    "INTEGRITY_API",
+    "FRONTEND_PAGES",
+    "TEST_SUITE",
+    "SYSTEM_VERIFICATION_DEMO"
+  ],
+  "implementation_order": [
+    "ENV_SETUP",
+    "DATASET_PACK",
+    "DJANGO_CORE",
+    "ACCOUNTS_APP",
+    "SERVICES_VALIDATOR",
+    "SERVICES_MODEL_INTEGRITY",
+    "INSPECTIONS_APP",
+    "REVIEWS_APP",
+    "SERVICES_METRICS",
+    "EVALUATION_APP",
+    "INTEGRITY_API",
+    "SCRIPTS",
+    "FRONTEND_PAGES",
+    "TEST_SUITE",
+    "SYSTEM_VERIFICATION_DEMO"
+  ],
+  "nodes": [
+    {
+      "id": "ENV_SETUP",
+      "name": "Environment & Infrastructure Setup",
+      "description": "Virtual environment creation, requirements.txt, .env.example, .env, docker-compose.yml, Makefile, and initial project structure.",
+      "depends_on": [],
+      "input": "System Python 3.12",
+      "output": "Active venv, installed packages (Django, DRF, simplejwt, Pillow, NumPy, pytest), .env, docker-compose.yml, Makefile",
+      "status": "VERIFIED",
+      "validation_criteria": "Python packages importable without error; .env configuration readable."
+    },
+    {
+      "id": "DATASET_PACK",
+      "name": "Synthetic Dataset, Pretrained Model & Integrity Pack",
+      "description": "Create Model/classifier.npz, Model/inference.py (predict function contract), Model/requirements.txt, Samples/images (60 images: 30 Normal, 30 Defective), Samples/labels.csv, Validation/ (3 fixtures: not_an_image.jpg, corrupt_image.png, too_small.png), and SHA256SUMS.txt.",
+      "depends_on": ["ENV_SETUP"],
+      "input": "Pillow, NumPy image generation scripts",
+      "output": "Model/, Samples/, Validation/ directories with SHA256SUMS.txt matching hashes exactly.",
+      "status": "VERIFIED",
+      "validation_criteria": "python Model/inference.py Samples/images/inspection_001.png prints valid JSON; SHA256 checksums match 100%."
+    },
+    {
+      "id": "DJANGO_CORE",
+      "name": "Django Project Core Architecture",
+      "description": "Initialize Django backend with config settings, urls, wsgi, custom apps registration, static/media configuration, REST Framework, CORS, and SimpleJWT.",
+      "depends_on": ["ENV_SETUP"],
+      "input": "backend/config layout",
+      "output": "backend/config/settings.py, urls.py, wsgi.py, manage.py",
+      "status": "VERIFIED",
+      "validation_criteria": "python manage.py check passes cleanly with no system check issues."
+    },
+    {
+      "id": "ACCOUNTS_APP",
+      "name": "Accounts App & Role-Based Access Control",
+      "description": "Custom User model with OPERATOR, SUPERVISOR, ADMIN roles; JWT auth endpoints (/api/auth/login/, refresh/, logout/, me/); DRF permissions (IsOperator, IsSupervisor, IsAdminUser); /api/users/ admin endpoints.",
+      "depends_on": ["DJANGO_CORE"],
+      "input": "User model schema, role specifications",
+      "output": "backend/apps/accounts/ models, views, serializers, permissions, urls",
+      "status": "VERIFIED",
+      "validation_criteria": "Users created with roles; JWT login returns access/refresh and role; role permissions return 401 unauth and 403 forbidden."
+    },
+    {
+      "id": "SERVICES_VALIDATOR",
+      "name": "Image Validator Service",
+      "description": "backend/services/image_validator.py validating uploads before inference: extension/content type, real image check, corrupt/truncated image check with im.load(), dimension >= MIN_IMAGE_DIM (64), max size <= 10MB, returning standard error codes.",
+      "depends_on": ["DATASET_PACK", "DJANGO_CORE"],
+      "input": "Uploaded file or file-like stream",
+      "output": "ValidationResult(is_valid, error_code, error_message, image_obj)",
+      "status": "VERIFIED",
+      "validation_criteria": "Validation fixtures not_an_image.jpg, corrupt_image.png, too_small.png rejected with correct error codes."
+    },
+    {
+      "id": "SERVICES_MODEL_INTEGRITY",
+      "name": "Model Service & SHA256 Integrity Service",
+      "description": "backend/services/model_service.py thin wrapper around Model.inference.predict; backend/services/integrity_service.py to verify filesystem files against SHA256SUMS.txt.",
+      "depends_on": ["DATASET_PACK", "DJANGO_CORE"],
+      "input": "File path, SHA256SUMS.txt path",
+      "output": "Model prediction dict (predicted_class, confidence, defect_probability, model_version); Integrity report dict.",
+      "status": "VERIFIED",
+      "validation_criteria": "model_service output matches Model/inference.py output; integrity_service detects valid files and tampered copies."
+    },
+    {
+      "id": "INSPECTIONS_APP",
+      "name": "Inspections App & API",
+      "description": "Inspection model with immutability enforcement on completed inspections; POST /api/inspections/ (validate -> predict -> persist); GET /api/inspections/ (role-scoped); GET /api/inspections/{id}/.",
+      "depends_on": ["ACCOUNTS_APP", "SERVICES_VALIDATOR", "SERVICES_MODEL_INTEGRITY"],
+      "input": "Multipart image upload, DRF Request",
+      "output": "Inspection instance, JSON API responses",
+      "status": "VERIFIED",
+      "validation_criteria": "Upload valid plate persists prediction; upload invalid file rejects with 400 and creates no completed inspection; operator only sees own inspections; original prediction cannot be modified."
+    },
+    {
+      "id": "REVIEWS_APP",
+      "name": "Reviews App & Append-Only History",
+      "description": "Review model (inspection, reviewer, decision CONFIRMED/OVERRIDDEN, comment, timestamp); POST /api/inspections/{id}/reviews/ (supervisor/admin); GET reviews; immutability of reviews.",
+      "depends_on": ["INSPECTIONS_APP"],
+      "input": "Review creation payload (decision, comment)",
+      "output": "Review instance, JSON API responses",
+      "status": "VERIFIED",
+      "validation_criteria": "Supervisor can create review; operator gets 403; multiple reviews append without altering inspection prediction; reviews cannot be updated or deleted."
+    },
+    {
+      "id": "SERVICES_METRICS",
+      "name": "Evaluation Metrics Service",
+      "description": "backend/services/metrics_service.py loading Samples/labels.csv, running predict() without human reviews, computing TP, FN, FP, TN, 2x2 confusion matrix (rows=actual, cols=pred, order Normal, Defective), recall, accuracy, precision, failed predictions list, FN=0 caveat statement.",
+      "depends_on": ["DATASET_PACK", "SERVICES_MODEL_INTEGRITY"],
+      "input": "Samples/labels.csv and sample images",
+      "output": "MetricsEvaluationResult dict with real calculated metrics",
+      "status": "VERIFIED",
+      "validation_criteria": "Computed metrics match raw model outputs on all 60 sample images; FN=0 caveat triggered when applicable; missing files reported explicitly."
+    },
+    {
+      "id": "EVALUATION_APP",
+      "name": "Evaluation App & Management Command",
+      "description": "GET /api/evaluation/ (latest metrics), POST /api/evaluation/run/ (trigger fresh run, supervisor/admin); management command `run_evaluation`.",
+      "depends_on": ["SERVICES_METRICS", "ACCOUNTS_APP"],
+      "input": "API request or CLI invocation",
+      "output": "JSON evaluation payload / console summary",
+      "status": "VERIFIED",
+      "validation_criteria": "python manage.py run_evaluation outputs full metrics; /api/evaluation/ returns verified metrics."
+    },
+    {
+      "id": "INTEGRITY_API",
+      "name": "Model Integrity Admin API",
+      "description": "GET /api/model/integrity/ (admin only) endpoint returning verified file statuses and mismatches against SHA256SUMS.txt.",
+      "depends_on": ["SERVICES_MODEL_INTEGRITY", "ACCOUNTS_APP"],
+      "input": "Admin authenticated request",
+      "output": "Integrity status JSON with file-by-file verification",
+      "status": "VERIFIED",
+      "validation_criteria": "Admin can query integrity; operator/supervisor receive 403; detects clean vs tampered state."
+    },
+    {
+      "id": "SCRIPTS",
+      "name": "Seeding & Utility Scripts",
+      "description": "scripts/create_admin.py, scripts/seed_users.py (creates operator1, supervisor1, admin1), scripts/run_evaluation.py.",
+      "depends_on": ["ACCOUNTS_APP", "EVALUATION_APP"],
+      "input": "Django environment",
+      "output": "Seeded database users with known passwords for testing/demo",
+      "status": "VERIFIED",
+      "validation_criteria": "seed_users.py creates operator, supervisor, admin accounts; can log in immediately."
+    },
+    {
+      "id": "FRONTEND_PAGES",
+      "name": "Frontend Industrial Dashboard UI",
+      "description": "Bootstrap 5 + vanilla JS industrial dashboard: base.html (dark navy sidebar, light content, alerts), login.html, upload.html (drag & drop, spinner, validation errors, limits notice), inspection_detail.html (review timeline), history.html (table, filters, badges), review_queue.html, evaluation.html (2x2 confusion matrix, recall KPI, FN=0 notice), admin_dashboard.html (users, integrity).",
+      "depends_on": ["INSPECTIONS_APP", "REVIEWS_APP", "EVALUATION_APP", "INTEGRITY_API"],
+      "input": "REST APIs, Bootstrap 5, Bootstrap Icons",
+      "output": "Responsive web UI templates and JS controllers",
+      "status": "VERIFIED",
+      "validation_criteria": "All pages render cleanly; user can log in, upload image, view result, review as supervisor, run evaluation, check integrity; no decorative non-working buttons."
+    },
+    {
+      "id": "TEST_SUITE",
+      "name": "Comprehensive Pytest Test Suite",
+      "description": "pytest + pytest-django covering all 8 test areas in Section 10: validation rejection, prediction fields + model_version, inference parity, role permissions (401/403), append-only reviews, evaluation metrics & confusion matrix orientation, integrity check, end-to-end flow.",
+      "depends_on": ["FRONTEND_PAGES"],
+      "input": "Django apps, services, test fixtures",
+      "output": "Passing pytest suite report",
+      "status": "VERIFIED",
+      "validation_criteria": "100% passing tests with 0 failures, testing real services without mocking the model."
+    },
+    {
+      "id": "SYSTEM_VERIFICATION_DEMO",
+      "name": "System Verification, Demonstration & Documentation",
+      "description": "Run smoke tests, Model/inference.py CLI test, evaluation command, UI walkthrough with screenshots proof, verify all Section 11 acceptance criteria, README.md setup documentation.",
+      "depends_on": ["TEST_SUITE"],
+      "input": "Running system, demo users",
+      "output": "loop_log.md verified, screenshots captured, README.md complete",
+      "status": "VERIFIED",
+      "validation_criteria": "All 7 acceptance criteria in Section 11 verified and demonstrated."
+    }
+  ]
+}

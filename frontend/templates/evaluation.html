@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Model Evaluation & Metrics{% endblock %}
+{% block page_title %}Model Evaluation Benchmark (BIT-PLATE-CV-1.0){% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <p class="text-secondary small mb-0">
+            Authoritative evaluation benchmark computed across 60 ground-truth development plates (30 Normal, 30 Defective) in <code>Samples/labels.csv</code>.
+        </p>
+    </div>
+    <button class="btn btn-primary btn-sm" id="run-eval-btn" onclick="triggerEvaluation()">
+        <span id="eval-btn-text"><i class="bi bi-play-fill me-1"></i> Run Fresh Evaluation</span>
+        <span id="eval-btn-spinner" class="spinner-border spinner-border-sm d-none" role="status"></span>
+    </button>
+</div>
+
+<!-- Evaluation Limitation Statement (Prompt Section 6.4) -->
+<div id="fn-caveat-container" class="alert alert-warning py-3 mb-4 d-none">
+    <div class="d-flex align-items-start">
+        <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning"></i>
+        <div>
+            <h6 class="fw-bold mb-1">Development Dataset Limitation Statement:</h6>
+            <p class="mb-0 small" id="fn-caveat-text">
+                no false negatives occurred, but 60 synthetic development images cannot establish real-world reliability.
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card border-primary">
+            <div class="kpi-label text-primary">Defect Recall (Primary)</div>
+            <div class="kpi-value text-primary mt-1" id="kpi-recall">--%</div>
+            <div class="text-muted small mt-1">TP / (TP + FN)</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="kpi-label">Overall Accuracy</div>
+            <div class="kpi-value text-dark mt-1" id="kpi-accuracy">--%</div>
+            <div class="text-muted small mt-1">(TP + TN) / Total</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="kpi-label">Defect Precision</div>
+            <div class="kpi-value text-dark mt-1" id="kpi-precision">--%</div>
+            <div class="text-muted small mt-1">TP / (TP + FP)</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card kpi-card">
+            <div class="kpi-label">Evaluation Samples</div>
+            <div class="kpi-value text-dark mt-1" id="kpi-samples">60</div>
+            <div class="text-muted small mt-1">30 Normal / 30 Defective</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- 2x2 Confusion Matrix -->
+    <div class="col-lg-6 mb-4">
+        <div class="card card-industrial h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-grid-3x3 me-2 text-primary"></i>2x2 Confusion Matrix</span>
+                <span class="badge bg-secondary">Rows: Actual | Cols: Predicted</span>
+            </div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">
+                    Defective is positive class (1). Rows represent ground truth; columns represent model predictions.
+                </p>
+
+                <div class="table-responsive">
+                    <table class="table matrix-table text-center align-middle w-100">
+                        <thead>
+                            <tr>
+                                <th class="border-0"></th>
+                                <th class="border bg-light fw-bold py-2" style="width: 40%;">Predicted Normal (0)</th>
+                                <th class="border bg-light fw-bold py-2" style="width: 40%;">Predicted Defective (1)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th class="border bg-light fw-bold text-start px-3" style="width: 20%;">Actual Normal (0)</th>
+                                <td class="matrix-cell matrix-cell-tn">
+                                    <div class="fs-3 fw-bold" id="cm-tn">0</div>
+                                    <div class="small fw-normal">True Negative (TN)</div>
+                                </td>
+                                <td class="matrix-cell matrix-cell-fp">
+                                    <div class="fs-3 fw-bold" id="cm-fp">0</div>
+                                    <div class="small fw-normal">False Positive (FP)</div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="border bg-light fw-bold text-start px-3">Actual Defective (1)</th>
+                                <td class="matrix-cell matrix-cell-fn">
+                                    <div class="fs-3 fw-bold" id="cm-fn">0</div>
+                                    <div class="small fw-normal">False Negative (FN)</div>
+                                </td>
+                                <td class="matrix-cell matrix-cell-tp">
+                                    <div class="fs-3 fw-bold" id="cm-tp">0</div>
+                                    <div class="small fw-normal">True Positive (TP)</div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-3 p-3 bg-light rounded small">
+                    <div class="fw-semibold text-dark mb-1">Matrix Interpretation:</div>
+                    <ul class="mb-0 ps-3 text-secondary">
+                        <li><strong>TN (True Negative):</strong> Normal plates correctly classified as Normal.</li>
+                        <li><strong>TP (True Positive):</strong> Defective plates correctly flagged as Defective.</li>
+                        <li><strong>FP (False Positive):</strong> False alarm: Normal plate misclassified as Defective.</li>
+                        <li><strong>FN (False Negative):</strong> Critical error: Defective plate missed and labeled Normal.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Missing / Failed Predictions & Benchmark Run Details -->
+    <div class="col-lg-6 mb-4">
+        <div class="card card-industrial h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-card-checklist me-2 text-primary"></i>Benchmark Run Diagnostics</span>
+                <span class="badge bg-dark" id="eval-model-version">BIT-PLATE-CV-1.0</span>
+            </div>
+            <div class="card-body">
+                <div class="row g-2 small mb-3">
+                    <div class="col-sm-5 text-muted">Evaluated At:</div>
+                    <div class="col-sm-7 fw-semibold" id="eval-timestamp">-</div>
+
+                    <div class="col-sm-5 text-muted">Total Samples In CSV:</div>
+                    <div class="col-sm-7 fw-semibold" id="eval-total-samples">60</div>
+
+                    <div class="col-sm-5 text-muted">Successful Predictions:</div>
+                    <div class="col-sm-7 text-success fw-bold" id="eval-successful">60</div>
+
+                    <div class="col-sm-5 text-muted">Failed / Dropped:</div>
+                    <div class="col-sm-7 fw-bold" id="eval-failed-count">0</div>
+                </div>
+
+                <div class="border-top pt-3">
+                    <h6 class="fw-bold small text-uppercase text-secondary mb-2">Missing / Failed Image Tracking</h6>
+                    <div id="failed-predictions-container">
+                        <div class="alert alert-success py-2 small mb-0">
+                            <i class="bi bi-check-circle-fill me-1"></i> All 60 sample plates processed with 0 failures or dropped predictions.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-top pt-3 mt-3">
+                    <h6 class="fw-bold small text-uppercase text-secondary mb-2">Audit Compliance Note</h6>
+                    <p class="small text-muted mb-0">
+                        Evaluations run strictly on original model outputs from <code>Model/inference.py</code> prior to human supervisor review. Ground truth labels in <code>Samples/labels.csv</code> are never fed into inference.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Itemized 60-Plate Evaluation Breakdown Table -->
+<div class="card card-industrial">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check me-2 text-primary"></i>All 60 Samples Evaluation Breakdown</span>
+        <span class="badge bg-secondary">60 Plates</span>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-sm table-hover align-middle mb-0 font-monospace small">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th>Path</th>
+                        <th>Actual Ground Truth</th>
+                        <th>Predicted Label</th>
+                        <th>Confidence</th>
+                        <th>Defect Probability</th>
+                        <th>Matrix Cell</th>
+                    </tr>
+                </thead>
+                <tbody id="eval-items-tbody">
+                    <tr>
+                        <td colspan="6" class="text-center py-3 text-muted">Loading breakdown...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadEvaluation() {
+        try {
+            const res = await apiFetch('/evaluation/');
+            if (!res.ok) {
+                if (res.status === 403) {
+                    alert('Access Denied: Operators do not have permission to view evaluation metrics.');
+                    window.location.href = '/upload/';
+                    return;
+                }
+                alert('Could not load evaluation metrics.');
+                return;
+            }
+
+            const data = await res.json();
+            renderEvaluationReport(data);
+        } catch (err) {
+            console.error('Error fetching evaluation:', err);
+        }
+    }
+
+    async function triggerEvaluation() {
+        const btnText = document.getElementById('eval-btn-text');
+        const btnSpinner = document.getElementById('eval-btn-spinner');
+        const runBtn = document.getElementById('run-eval-btn');
+
+        btnText.classList.add('d-none');
+        btnSpinner.classList.remove('d-none');
+        runBtn.disabled = true;
+
+        try {
+            const res = await apiFetch('/evaluation/run/', { method: 'POST' });
+            if (res.ok) {
+                const data = await res.json();
+                renderEvaluationReport(data);
+            } else {
+                alert('Evaluation run failed.');
+            }
+        } catch (err) {
+            alert('Network error during evaluation run: ' + err.message);
+        } finally {
+            btnText.classList.remove('d-none');
+            btnSpinner.classList.add('d-none');
+            runBtn.disabled = false;
+        }
+    }
+
+    function renderEvaluationReport(data) {
+        // KPIs
+        const recallPct = (data.defect_recall * 100).toFixed(1) + '%';
+        const accPct = (data.accuracy * 100).toFixed(1) + '%';
+        const precPct = (data.precision * 100).toFixed(1) + '%';
+
+        document.getElementById('kpi-recall').textContent = recallPct;
+        document.getElementById('kpi-accuracy').textContent = accPct;
+        document.getElementById('kpi-precision').textContent = precPct;
+        document.getElementById('kpi-samples').textContent = data.total_samples;
+
+        // Confusion Matrix
+        // Row 0: Actual Normal -> [TN, FP]
+        // Row 1: Actual Defective -> [FN, TP]
+        document.getElementById('cm-tn').textContent = data.tn;
+        document.getElementById('cm-fp').textContent = data.fp;
+        document.getElementById('cm-fn').textContent = data.fn;
+        document.getElementById('cm-tp').textContent = data.tp;
+
+        // Diagnostics
+        document.getElementById('eval-timestamp').textContent = new Date(data.evaluated_at).toLocaleString();
+        document.getElementById('eval-total-samples').textContent = data.total_samples;
+        document.getElementById('eval-successful').textContent = data.successful_count;
+        document.getElementById('eval-failed-count').textContent = data.failed_count;
+        document.getElementById('eval-model-version').textContent = data.model_version;
+
+        // FN=0 Caveat Statement
+        const caveatContainer = document.getElementById('fn-caveat-container');
+        const caveatText = document.getElementById('fn-caveat-text');
+        if (data.fn_zero_caveat) {
+            caveatText.textContent = data.fn_zero_caveat;
+            caveatContainer.classList.remove('d-none');
+        } else {
+            caveatContainer.classList.add('d-none');
+        }
+
+        // Failed Predictions tracking
+        const failedContainer = document.getElementById('failed-predictions-container');
+        if (data.failed_count > 0 && data.failed_predictions) {
+            let html = '<div class="alert alert-danger py-2 small mb-0"><ul class="mb-0 ps-3">';
+            data.failed_predictions.forEach(fp => {
+                html += `<li><strong>${fp.path}:</strong> ${fp.error}</li>`;
+            });
+            html += '</ul></div>';
+            failedContainer.innerHTML = html;
+        } else {
+            failedContainer.innerHTML = `
+                <div class="alert alert-success py-2 small mb-0">
+                    <i class="bi bi-check-circle-fill me-1"></i> All ${data.successful_count} sample plates processed with 0 failures or dropped predictions.
+                </div>
+            `;
+        }
+
+        // 60-plate table
+        const tbody = document.getElementById('eval-items-tbody');
+        if (data.items && data.items.length > 0) {
+            let rows = '';
+            data.items.forEach(item => {
+                const isCorrect = (item.status === 'TP' || item.status === 'TN');
+                const badgeClass = isCorrect ? 'bg-success' : 'bg-danger';
+
+                rows += `
+                    <tr>
+                        <td>${item.path}</td>
+                        <td>${item.actual_name} (${item.actual_class})</td>
+                        <td>${item.predicted_name} (${item.predicted_class})</td>
+                        <td>${(item.confidence * 100).toFixed(1)}%</td>
+                        <td>${(item.defect_probability * 100).toFixed(1)}%</td>
+                        <td><span class="badge ${badgeClass}">${item.status}</span></td>
+                    </tr>
+                `;
+            });
+            tbody.innerHTML = rows;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadEvaluation);
+</script>
+{% endblock %}
+
