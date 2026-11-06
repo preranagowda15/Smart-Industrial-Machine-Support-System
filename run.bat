@@ -24,9 +24,9 @@ REM Seed demo accounts
 echo [2/3] Verifying demonstration users and manuals...
 python scripts/seed_data.py
 
-REM Open browser automatically
+REM Open browser automatically after Django is reachable
 echo [3/3] Opening browser at http://127.0.0.1:8000/login/ ...
-start "" "http://127.0.0.1:8000/login/"
+start "" powershell.exe -NoProfile -Command "$u='http://127.0.0.1:8000/login/'; for($i=0;$i -lt 60;$i++){try{if((Invoke-WebRequest -Uri $u -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200){Start-Process $u; break}}catch{Start-Sleep -Milliseconds 500}}"
 
 echo.
 echo =========================================================

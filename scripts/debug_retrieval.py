@@ -16,7 +16,18 @@ queries = [
     "What is the maximum operating pressure?",
     "How often do I replace the hydraulic oil filter?",
     "What is the AC-90 rated discharge pressure?",
-    "How do I program the CNC lathe and what is the salary of the operator?"
+    "How do I program the CNC lathe and what is the salary of the operator?",
+    "What is the recommended outlet pressure for AC-90?",
+	"What are the operating instructions for AC-90?",
+	"What maintenance procedures are required for AC-90?",
+	"What safety precautions should be followed when using AC-90?",
+	"What should be checked before operating AC-90?",
+	"What are the common problems with AC-90?",
+	"What should be done during routine maintenance of AC-90?",
+	"What should I check if AC-90 is not working properly?",
+	"What information does the manual provide about AC-90 maintenance?",
+	"What are the important warnings mentioned in the AC-90 manual?",
+ 
 ]
 
 for q in queries:

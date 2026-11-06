@@ -25,9 +25,21 @@ Write-Host "[1/3] Checking database migrations..." -ForegroundColor Green
 Write-Host "[2/3] Verifying demonstration users and manuals..." -ForegroundColor Green
 & $VenvPython scripts/seed_data.py
 
-# Launch browser
+# Launch browser after the Django server is reachable
 Write-Host "[3/3] Opening browser at http://127.0.0.1:8000/login/ ..." -ForegroundColor Green
-Start-Process "http://127.0.0.1:8000/login/"
+Start-Job -ScriptBlock {
+    $url = "http://127.0.0.1:8000/login/"
+    for ($attempt = 0; $attempt -lt 60; $attempt++) {
+        try {
+            if ((Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2).StatusCode -eq 200) {
+                Start-Process $url
+                break
+            }
+        } catch {
+            Start-Sleep -Milliseconds 500
+        }
+    }
+} | Out-Null
 
 Write-Host "`n=========================================================" -ForegroundColor Cyan
 Write-Host "Server running at: http://127.0.0.1:8000/" -ForegroundColor Green

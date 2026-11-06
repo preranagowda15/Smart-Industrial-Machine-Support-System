@@ -214,9 +214,9 @@ class RAGService:
 
         # Check for unsupported external questions (prices, suppliers, general knowledge)
         unsupported_keywords = [
-            "price", "cost", "supplier", "vendor", "buy", "purchase", "lathe", "cnc", 
-            "salary", "weather", "torque", "wiring", "circuit drawing", "internal repair", 
-            "guarantee", "service contract", "remaining life", "future failure"
+            "price", "cost", "supplier", "vendor", "buy", "purchase", "lathe", "cnc",
+            "salary", "weather", "service contract", "guarantee", "stock market",
+            "share price", "other machine", "different machine"
         ]
         if any(w in q_lower for w in unsupported_keywords):
             return {
@@ -420,17 +420,43 @@ class RAGService:
                         break
 
         if not answer_parts or not used_indices:
-            # Check if any top hit has high textual overlap with the query
-            top_hit = hits[0]
-            if top_hit["similarity"] >= 0.55:
-                used_indices.append(1)
-                answer_parts.append(f"Based on the official manual ({top_hit['metadata'].get('document_id')}): {top_hit['text']}")
+            stop_words = {
+                "what", "when", "where", "why", "how", "which", "who", "does",
+                "do", "did", "is", "are", "was", "were", "the", "a", "an", "in",
+                "on", "at", "to", "for", "of", "with", "by", "and", "or", "it",
+                "this", "that", "from", "as", "be", "can", "could", "would",
+                "should", "tell", "give", "please", "my"
+            }
+            query_terms = {
+                term for term in re.findall(r"[a-z0-9][a-z0-9\-]+", q_lower)
+                if term not in stop_words and len(term) >= 3
+            }
+
+            ranked_hits = []
+            for idx, hit in enumerate(hits, 1):
+                text = hit["text"]
+                text_lower = text.lower()
+                text_terms = set(re.findall(r"[a-z0-9][a-z0-9\-]+", text_lower))
+                overlap = query_terms.intersection(text_terms)
+                exact_overlap = any(term in text_lower for term in query_terms)
+                if overlap or exact_overlap:
+                    ranked_hits.append((len(overlap) + (2 if exact_overlap else 0), idx, hit))
+
+            ranked_hits.sort(key=lambda item: (item[0], item[1]), reverse=True)
+            if ranked_hits:
+                _, idx, top_hit = ranked_hits[0]
+                used_indices.append(idx)
+                answer_parts.append(
+                    f"Based on the official manual passage from "
+                    f"{top_hit['metadata'].get('document_id', 'the manual')}: "
+                    f"{top_hit['text']}"
+                )
             else:
                 return {
                     "answer": INSUFFICIENT_EVIDENCE_TEXT,
                     "insufficient": True,
                     "used_source_indices": [],
-                    "explanation": "No passage in the selected machine's manual provides conclusive evidence for this question."
+                    "explanation": "No retrieved passage has enough direct technical overlap with this question."
                 }
 
         return {
